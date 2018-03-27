@@ -14,9 +14,10 @@ USE_GPU = False
 class VDN(object):
     def __init__(self):
 
+        self.algorithm = 'VDN'
         self.game_name = game
 
-        self.progess = ''
+        self.progress = ''
         self.Num_action = 5 ######################
 
         self.Num_replay_episode = 500
@@ -44,7 +45,7 @@ class VDN(object):
         # self.Load_path = Parameters.Load_path
 
         self.step = 1
-        # self.score = 0
+        self.score = 0
         self.episode = 0
 
         # Training time
@@ -85,11 +86,12 @@ class VDN(object):
         self.step_old = 0
 
         # Initialize Network
+        self.sess, self.saver, self.summary_placeholders, \
+        self.update_ops, self.summary_op, self.summary_writer = self.init_sess()
         self.input_1,self.input_2, self.output, self.Q_1, self.Q_2 = self.network('network')
         self.input_target_1, self.input_target_2, self.output_target,self.Q_1_target, self.Q_2_target = self.network('target')
         self.train_step, self.action_target, self.y_target, self.loss_train = self.loss_and_train()
-        self.sess, self.saver, self.summary_placeholders, \
-        self.update_ops, self.summary_op, self.summary_writer = self.init_sess()
+
 
     def main(self):
         pass
@@ -224,15 +226,15 @@ class VDN(object):
             Q_1 = tf.matmul(h_fc2_1, w_out_1) + b_out_1
             Q_2 = tf.matmul(h_fc2_2, w_out_2) + b_out_2
             # compute joint Q
-            l = []
+            tmp1 = []
+            l = tf.reshape(Q_1, [-1])
             for i in range(self.Num_action):
-                l.append(Q_1)
-            tmp1 = tf.transpose(l, [1, 0])
-            tmp1 = tf.reshape(tmp1,[-1])
-            tmp2 = tf.constant(Q_2)
+                tmp1.append(l)
+            tmp1 = tf.transpose(tmp1, [1, 0])
+            tmp1 = tf.reshape(tmp1, [-1, self.Num_action * self.Num_action])
+            tmp2 = Q_2
             for i in range(self.Num_action - 1):
-                tmp2 = tf.concat([tmp2, Q_2], 0)
-
+                tmp2 = tf.concat([tmp2, Q_2], 1)
             Q_joint = tf.add(tmp1, tmp2)
 
             return x_1, x_2, Q_joint, Q_1, Q_2
@@ -254,13 +256,13 @@ class VDN(object):
         action_2 = np.zeros([self.Num_action])
         action_2_index = 0
         # choose action
-        if self.progess == 'Exploring':
+        if self.progress == 'Exploring':
             # choose random action
             action_1_index = random.randint(0, self.Num_action - 1)
             action_2_index = random.randint(0, self.Num_action - 1)
             action_1[action_1_index] = 1
             action_2[action_2_index] = 1
-        elif self.progess == 'Training':
+        elif self.progress == 'Training':
             if random.random() < self.epsilon:
                 # choose random action
                 action_1_index = random.randint(0, self.Num_action - 1)
@@ -280,7 +282,7 @@ class VDN(object):
             # Decrease epsilon while training
             if self.epsilon > self.final_epsilon:
                 self.epsilon -= self.first_epsilon/self.Num_Training
-        elif self.progess == 'Testing':
+        elif self.progress == 'Testing':
             # choose greedy action
             Q_1_value = self.Q_1.eval(feed_dict={self.input_1: [stack_state_1]})
             action_1_index = np.argmax(Q_1_value)
@@ -327,6 +329,13 @@ class VDN(object):
         next_state_1_batch = [batch[3][0] for batch in minibatch]
         next_state_2_batch = [batch[3][1] for batch in minibatch]
         terminal_batch = [batch[4] for batch in minibatch]
+        action_batch = []
+        for i in range(len(minibatch)):
+            tmp = np.zeros([self.Num_action * self.Num_action])
+            index = np.argmax(action_1_batch[i]) * self.Num_action + np.argmax(action_2_batch[i])
+            tmp[index] = 1
+            action_batch.append(tmp)
+
 
         # get y_prediction
         y_batch = []
@@ -339,7 +348,66 @@ class VDN(object):
             else:
                 y_batch.append(reward_batch + self.gamma * np.max(Q_batch[i]))
 
-        _, self.loss = self.sess.run([self.train_step, self.loss_train], feed_dict={self.action_target:action})
+        _, self.loss = self.sess.run([self.train_step, self.loss_train],
+                                     feed_dict={self.action_target:action_batch,
+                                                self.y_target:y_batch,
+                                                self.input_1:state_1_batch,
+                                                self.input_2:state_2_batch})
+
+    def save_model(self):
+        # Save the variables to disk.
+        if self.step == self.Num_Exploration + self.Num_Training:
+            save_path = self.saver.save(self.sess, 'saved_networks/' + self.game_name +
+                                        '/' + self.date_time +  '_' + self.algorithm + "/model.ckpt")
+            print("Model saved in file: %s" % save_path)
+
+    def plotting(self, terminal):
+        if self.progress != 'Exploring':
+            if terminal:
+                self.score_board += self.score
+
+            self.maxQ_board += self.maxQ
+            self.loss_board += self.loss
+
+            if self.episode % self.Num_plot_episode == 0 and self.episode != 0 and terminal:
+                diff_step = self.step - self.step_old
+                tensorboard_info = [self.score_board / self.Num_plot_episode, self.maxQ_board / diff_step, self.loss_board / diff_step]
+
+                for i in range(len(tensorboard_info)):
+                    self.sess.run(self.update_ops[i], feed_dict={self.summary_placeholders[i]:float(tensorboard_info[i])})
+                summary_str = self.sess.run(self.summary_op)
+                self.summary_writer.add_summary(summary_str, self.step)
+
+                self.score_board = 0
+                self.maxQ_board = 0
+                self.loss_board = 0
+                self.step_old = self.step
+        else:
+            self.step_old = self.step
+
+
+    def if_terminal(self, game_state):
+        # Show Progress
+        print('Step: ' + str(self.step) + ' / ' +
+              'Episode: ' + str(self.episode) + ' / ' +
+              'Progress: ' + self.progress + ' / ' +
+              'Epsilon: ' + str(self.epsilon) + ' / ' +
+              'Score: ' + str(self.score))
+        if self.progress != 'Exploring':
+            self.episode += 1
+        self.score = 0
+
+        # If game is finished, initialize the state
+        state = self.initialization(game_state)
+        stacked_state = self.skip_and_stack_frame(state)
+
+        return stacked_state
+
+if __name__ == '__main__':
+    agent = VDN()
+    agent.main()
+
+
 
 
 
