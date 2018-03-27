@@ -304,6 +304,43 @@ class VDN(object):
     def update_target(self):
         # Get trainable variables
         trainable_variables = tf.trainable_variables()
+        # network variables
+        trainable_variables_network = [var for var in trainable_variables if var.name.startswith('network')]
+
+        # target variables
+        trainable_variables_target = [var for var in trainable_variables if var.name.startswith('target')]
+
+        for i in range(len(trainable_variables_network)):
+            self.sess.run(tf.assign(trainable_variables_target[i], trainable_variables_network[i]))
+
+    def train(self, replay_memory):
+
+        # Sample from replay memory
+        minibatch = random.sample(replay_memory, self.Num_batch)
+
+        # save the each batch data
+        state_1_batch = [batch[0][0] for batch in minibatch]
+        state_2_batch = [batch[0][1] for batch in minibatch]
+        action_1_batch = [batch[1][0] for batch in minibatch]
+        action_2_batch = [batch[1][1] for batch in minibatch]
+        reward_batch = [batch[2] for batch in minibatch]
+        next_state_1_batch = [batch[3][0] for batch in minibatch]
+        next_state_2_batch = [batch[3][1] for batch in minibatch]
+        terminal_batch = [batch[4] for batch in minibatch]
+
+        # get y_prediction
+        y_batch = []
+        Q_batch = self.output_target.eval(feed_dict={self.input_target_1:next_state_1_batch,
+                                                     self.input_target_2:next_state_2_batch})
+        # get target values
+        for i in range(len(minibatch)):
+            if terminal_batch[i] == True:
+                y_batch.append(reward_batch[i])
+            else:
+                y_batch.append(reward_batch + self.gamma * np.max(Q_batch[i]))
+
+        _, self.loss = self.sess.run([self.train_step, self.loss_train], feed_dict={self.action_target:action})
+
 
 
 
