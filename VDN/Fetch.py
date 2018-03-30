@@ -118,7 +118,7 @@ class AgentObj:
     def stay(self, **kwargs):
         pass
 
-    def beam(self, env):#env_x_size, env_y_size):
+    def beam(self, env):# env_x_size, env_y_size):
         env_x_size = env.size_x
         env_y_size = env.size_y
         if self.direction == 0:
@@ -136,7 +136,7 @@ class AgentObj:
 
 class PointObj:
     def __init__(self, coordinates, type, reward, hidden=0):
-        # type: 1 is pick-up, 3 is drop
+        # type: #1 is pick-up, 3 is drop
         self.x = coordinates[0]
         self.y = coordinates[1]
         self.type = type
@@ -301,6 +301,7 @@ class GameEnv:
         a = np.stack([b, c, d], axis=2)
         return a
 
+    # 需要改成返回每个agent周围5格的图片。
     def train_render(self):
         a = self.contribute_metrix()
 
