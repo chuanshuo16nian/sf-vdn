@@ -302,12 +302,80 @@ class GameEnv:
         return a
 
     # 需要改成返回每个agent周围5格的图片。
-    def train_render(self):
+    # def train_render(self):
+    #     a = self.contribute_metrix()
+    #
+    #     b = scipy.misc.imresize(a[:, :, 0], [84, 84, 1], interp='nearest')
+    #     c = scipy.misc.imresize(a[:, :, 1], [84, 84, 1], interp='nearest')
+    #     d = scipy.misc.imresize(a[:, :, 2], [84, 84, 1], interp='nearest')
+    #
+    #     a = np.stack([b, c, d], axis=2)
+    #     return a
+
+    def get_index(self):
+        agent1_x = self.agent1.x
+        agent1_y = self.agent1.y
+        agent2_x = self.agent2.x
+        agent2_y = self.agent2.y
+        if agent1_y == 0:
+            agent1_y_low_index = agent1_y
+        else:
+            agent1_y_low_index = agent1_y - 1
+        if agent1_y == 6:
+            agent1_y_high_index = agent1_y + 3
+        else:
+            agent1_y_high_index = agent1_y + 4
+
+        if agent1_x == 0:
+            agent1_x_low_index = agent1_x
+        else:
+            agent1_x_low_index = agent1_x - 1
+        if agent1_x == 33:
+            agent1_x_high_index = agent1_x + 3
+        else:
+            agent1_x_high_index = agent1_x + 4
+
+        if agent2_y == 0:
+            agent2_y_low_index = agent2_y
+        else:
+            agent2_y_low_index = agent2_y - 1
+        if agent2_y == 6:
+            agent2_y_high_index = agent2_y + 3
+        else:
+            agent2_y_high_index = agent2_y + 4
+
+        if agent2_x == 0:
+            agent2_x_low_index = agent2_x
+        else:
+            agent2_x_low_index = agent2_x - 1
+        if agent2_x == 33:
+            agent2_x_high_index = agent2_x + 3
+        else:
+            agent2_x_high_index = agent2_x + 4
+        return agent1_y_low_index, agent1_y_high_index, agent1_x_low_index, agent1_x_high_index, \
+                agent2_y_low_index, agent2_y_high_index, agent2_x_low_index, agent2_x_high_index
+
+    def render_state(self):
+        agent1_y_low_index, agent1_y_high_index, agent1_x_low_index, agent1_x_high_index, \
+        agent2_y_low_index, agent2_y_high_index, agent2_x_low_index, agent1_x_high_index = self.get_index()
+
         a = self.contribute_metrix()
+        test1 = a[agent1_y_low_index :agent1_y_high_index, agent1_x_low_index:agent1_x_high_index, 0]
+        test2 = a[agent1_y_low_index:agent1_y_high_index, agent1_x_low_index:agent1_x_high_index, 0]
+        test3 = a[agent1_y_low_index:agent1_y_high_index, agent1_x_low_index:agent1_x_high_index, 0]
+        b1 = scipy.misc.imresize(a[agent1_y_low_index :agent1_y_high_index, agent1_x_low_index:agent1_x_high_index, 0], [50, 50, 1],
+                                interp='nearest')
+        c1 = scipy.misc.imresize(a[agent1_y_low_index :agent1_y_high_index, agent1_x_low_index:agent1_x_high_index, 1], [50, 50, 1],
+                                interp='nearest')
+        d1 = scipy.misc.imresize(a[agent1_y_low_index :agent1_y_high_index, agent1_x_low_index:agent1_x_high_index, 2], [50, 50, 1],
+                                interp='nearest')
+        a1 = np.stack([b1, c1, d1], axis=2)
 
-        b = scipy.misc.imresize(a[:, :, 0], [84, 84, 1], interp='nearest')
-        c = scipy.misc.imresize(a[:, :, 1], [84, 84, 1], interp='nearest')
-        d = scipy.misc.imresize(a[:, :, 2], [84, 84, 1], interp='nearest')
-
-        a = np.stack([b, c, d], axis=2)
-        return a
+        b2 = scipy.misc.imresize(a[agent2_y_low_index:agent2_y_high_index, agent2_x_low_index:agent1_x_high_index, 0], [50, 50, 1],
+                                 interp='nearest')
+        c2 = scipy.misc.imresize(a[agent2_y_low_index:agent2_y_high_index, agent2_x_low_index:agent1_x_high_index, 1], [50, 50, 1],
+                                 interp='nearest')
+        d2 = scipy.misc.imresize(a[agent2_y_low_index:agent2_y_high_index, agent2_x_low_index:agent1_x_high_index, 2], [50, 50, 1],
+                                 interp='nearest')
+        a2 = np.stack([b2, c2, d2,], axis=2)
+        return a1, a2
