@@ -16,10 +16,10 @@ t = 0
 # f2 = fig.add_subplot(122)
 while True:
     if show:
-        print(env.agent1.y, env.agent1.x, env.agent2.y, env.agent2.x)
-        print(env.get_index())
-        t1,t2 = env.render_state()
-
+        # print(env.agent1.y, env.agent1.x, env.agent2.y, env.agent2.x)
+        # print(env.get_index())
+        t1,t2 = env.get_states()
+        print(t1.shape)
         plt.imshow(t1)
         # f2.imshow(t2)
 
