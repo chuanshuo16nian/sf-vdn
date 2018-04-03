@@ -5,20 +5,30 @@ import matplotlib.pyplot as plt
 import datetime
 import time
 import os
-
+from PIL import Image
+import pylab
 import Parameters
+from Fetch import GameEnv
+
+
+def to_gray(state):
+    im = Image.fromarray(np.uint8(state * 255))
+    im = im.convert('L')
+    return pylab.array(im)
+
 
 game = 'Fetch'
 USE_GPU = False
+
 
 class VDN(object):
     def __init__(self):
 
         self.algorithm = 'VDN'
         self.game_name = game
-
+        self.env = GameEnv()
         self.progress = ''
-        self.Num_action = 5 ######################
+        self.Num_action = Parameters.Num_action ######################
 
         self.Num_replay_episode = 500
         self.step_size = 6
@@ -54,9 +64,9 @@ class VDN(object):
                          str(datetime.datetime.now().minute)
 
         # parameters for skip and stack
-        # self.state_set = []
-        # self.Num_skipping = Parameters.Num_skipFrame
-        # self.Num_stacking = Parameters.Num_stackFrame
+        self.state_set = []
+        self.Num_skipping = Parameters.Num_skipFrame
+        self.Num_stacking = Parameters.Num_stackFrame
 
         # parameters for experience replay
         self.Num_replay_memory = Parameters.Num_replay_memory
@@ -86,24 +96,83 @@ class VDN(object):
         self.step_old = 0
 
         # Initialize Network
-        self.sess, self.saver, self.summary_placeholders, \
-        self.update_ops, self.summary_op, self.summary_writer = self.init_sess()
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
+        config.log_device_placement = False
+        self.sess = tf.InteractiveSession(config=config)
         self.input_1,self.input_2, self.output, self.Q_1, self.Q_2 = self.network('network')
-        self.input_target_1, self.input_target_2, self.output_target,self.Q_1_target, self.Q_2_target = self.network('target')
-        self.train_step, self.action_target, self.y_target, self.loss_train = self.loss_and_train()
 
+        self.input_target_1, self.input_target_2, self.output_target,self.Q_1_target, self.Q_2_target = self.network('target')
+
+        self.train_step, self.action_target, self.y_target, self.loss_train = self.loss_and_train()
+        self.saver, self.summary_placeholders, \
+        self.update_ops, self.summary_op, self.summary_writer = self.init_sess()
+
+        self.sess.run(tf.global_variables_initializer())
 
     def main(self):
-        pass
+        states = self.initialization()
+        stacked_states = self.skip_and_stack_frame(states)
+        while True:
+            # Get progress
+            self.progress = self.get_progress()
+
+            # select action
+            act1_one_shot, act2_one_shot = self.select_action(stacked_states[0], stacked_states[1])
+            act1 = np.argmax(act1_one_shot)
+            act2 = np.argmax(act2_one_shot)
+            # Take actions and get info for update
+            r1, r2 = self.env.move(act1, act2)
+            r = r1 + r2
+            next_states_pre = self.env.get_states()
+            next_states = [to_gray(next_states_pre[0]), to_gray(next_states_pre[1])]
+            if r1 ==5 or r2 == 5:
+                terminal = True
+            else:
+                terminal = False
+            next_states= [self.reshape_input(next_states[0]), self.reshape_input(next_states[1])]
+            stacked_next_states = self.skip_and_stack_frame(next_states)
+
+            # Experience Replay
+            self.experience_replay(stacked_states, [act1, act2], r, stacked_next_states, terminal)
+
+            # Training
+            if self.progress == 'Training':
+                # Update target network
+                if self.step % self.Num_update_target == 0:
+                    self.update_target()
+
+                # train
+                self.train(self.replay_memory)
+
+                self.save_model()
+                self.save_model_backup()
+
+            # update former info.
+            stacked_states = stacked_next_states
+            self.score += r
+            self.step += 1
+
+            # Plotting
+            self.plotting(terminal)
+
+            # If game is over(terminal)
+            if terminal:
+                stacked_states = self.if_terminal()
+
+            # Finished!
+            if self.progress == 'Finished':
+                print('Finished!')
+                break
 
     def init_sess(self):
         # initialize variables
-        if USE_GPU:
-            config = tf.ConfigProto()
-            config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
-            sess = tf.InteractiveSession(config=config)
-        else:
-            sess = tf.InteractiveSession()
+        # if USE_GPU:
+        #     config = tf.ConfigProto()
+        #     config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
+        #     sess = tf.InteractiveSession(config=config)
+        # else:
+        #     sess = tf.InteractiveSession()
 
         # make folder to save model
         save_path = './saved_models/'+ self.game_name + '/' + self.date_time
@@ -111,10 +180,10 @@ class VDN(object):
 
         # Summary for tensorboard
         summary_placeholdes, update_ops, summary_op = self.setup_summary()
-        summary_writer = tf.summary.FileWriter(save_path, sess.graph)
+        summary_writer = tf.summary.FileWriter(save_path, self.sess.graph)
 
-        init = tf.global_variables_initializer()
-        sess.run(init)
+        # init = tf.local_variables_initializer()
+        # sess.run(init)
 
         # Load the file if the saved file exists
         saver = tf.train.Saver()
@@ -131,14 +200,30 @@ class VDN(object):
                 self.Num_Exploration = 0
                 self.Num_Training = 0
 
-        return sess, saver, summary_placeholdes, update_ops, summary_op, summary_writer
+        return saver, summary_placeholdes, update_ops, summary_op, summary_writer
 
-    def initialization(self, game_state):
-        initialState = ''
-        return initialState
+    def initialization(self):
+        self.env.reset()
+        agent1_state_pre, agent2_state_pre = self.env.get_states()
+        agent1_state = to_gray(agent1_state_pre)
+        agent2_state = to_gray(agent2_state_pre)
+        agent1_state_reshape = self.reshape_input(agent1_state)
+        agent2_state_reshape = self.reshape_input(agent2_state)
+        for i in range(self.Num_skipping * self.Num_stacking):
+            self.state_set.append([agent1_state_reshape, agent2_state_reshape])
+        return [agent1_state_reshape, agent2_state_reshape]
 
-    def skip_and_stack_frame(self, state):
-        pass
+    def skip_and_stack_frame(self, states):
+        self.state_set.append(states)
+        agent1_state_in = np.zeros([self.Num_stacking, np.int(self.input_size/self.Num_stacking)])
+        agent2_state_in = np.zeros([self.Num_stacking, np.int(self.input_size/self.Num_stacking)])
+        for i in range(self.Num_stacking):
+            agent1_state_in[i, :] = self.state_set[-1 - i][0]
+            agent2_state_in[i, :] = self.state_set[-1 - i][1]
+        del self.state_set[0]
+        agent1_state_in_rs = np.reshape(agent1_state_in, [-1])
+        agent2_state_in_rs = np.reshape(agent2_state_in, [-1])
+        return [agent1_state_in_rs, agent2_state_in_rs]
 
     def get_progress(self):
         progress = ''
@@ -154,7 +239,8 @@ class VDN(object):
 
     # Resize the input into a long vector
     def reshape_input(self, state):
-        pass
+        out = np.reshape(state, [-1])
+        return out
 
     # Code for tensorboard
     def setup_summary(self):
@@ -190,8 +276,8 @@ class VDN(object):
 
     def network(self, network_name):
         # input
-        x_1 = tf.placeholder(tf.float32, shape=[None, 75 * 4])
-        x_2 = tf.placeholder(tf.float32, shape=[None, 75 * 4])
+        x_1 = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
+        x_2 = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
 
         x_1_norm = (x_1 - (255.0 / 2)) / (255.0 / 2)
         x_2_norm = (x_2 - (255.0 / 2)) / (255.0 / 2)
@@ -332,7 +418,7 @@ class VDN(object):
         action_batch = []
         for i in range(len(minibatch)):
             tmp = np.zeros([self.Num_action * self.Num_action])
-            index = np.argmax(action_1_batch[i]) * self.Num_action + np.argmax(action_2_batch[i])
+            index = action_1_batch[i] * self.Num_action + action_2_batch[i]
             tmp[index] = 1
             action_batch.append(tmp)
 
@@ -346,8 +432,7 @@ class VDN(object):
             if terminal_batch[i] == True:
                 y_batch.append(reward_batch[i])
             else:
-                y_batch.append(reward_batch + self.gamma * np.max(Q_batch[i]))
-
+                y_batch.append(reward_batch[i] + self.gamma * np.max(Q_batch[i]))
         _, self.loss = self.sess.run([self.train_step, self.loss_train],
                                      feed_dict={self.action_target:action_batch,
                                                 self.y_target:y_batch,
@@ -357,8 +442,15 @@ class VDN(object):
     def save_model(self):
         # Save the variables to disk.
         if self.step == self.Num_Exploration + self.Num_Training:
-            save_path = self.saver.save(self.sess, 'saved_networks/' + self.game_name +
+            save_path = self.saver.save(self.sess, '/home/admin1/zp/VDN/saved_models/' + self.game_name +
                                         '/' + self.date_time +  '_' + self.algorithm + "/model.ckpt")
+            print("Model saved in file: %s" % save_path)
+
+    def save_model_backup(self):
+        # Save the variables to disk.
+        if self.step == 51000 or self.step % 140000 == 0:
+            save_path = self.saver.save(self.sess, '/home/admin1/zp/VDN/saved_models/' + self.game_name +
+                                        '/' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "/model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def plotting(self, terminal):
@@ -385,8 +477,7 @@ class VDN(object):
         else:
             self.step_old = self.step
 
-
-    def if_terminal(self, game_state):
+    def if_terminal(self):
         # Show Progress
         print('Step: ' + str(self.step) + ' / ' +
               'Episode: ' + str(self.episode) + ' / ' +
@@ -398,10 +489,11 @@ class VDN(object):
         self.score = 0
 
         # If game is finished, initialize the state
-        state = self.initialization(game_state)
+        state = self.initialization()
         stacked_state = self.skip_and_stack_frame(state)
 
         return stacked_state
+
 
 if __name__ == '__main__':
     agent = VDN()
