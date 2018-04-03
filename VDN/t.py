@@ -48,4 +48,4 @@ from pylab import *
 #     if r1 or r2:
 #         show = True
 #         print(i, 'r1:', r1, 'r2:', r2)
-print(np.zeros([10]))
+print(63%8)

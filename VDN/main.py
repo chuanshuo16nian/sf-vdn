@@ -18,7 +18,7 @@ def to_gray(state):
 
 
 game = 'Fetch'
-USE_GPU = False
+USE_GPU = True
 
 
 class VDN(object):
@@ -96,19 +96,86 @@ class VDN(object):
         self.step_old = 0
 
         # Initialize Network
-        config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
-        config.log_device_placement = False
-        self.sess = tf.InteractiveSession(config=config)
+        if USE_GPU:
+            config = tf.ConfigProto()
+            config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
+            config.log_device_placement = False
+            self.sess = tf.InteractiveSession(config=config)
+        else:
+            self.sess = tf.InteractiveSession()
         self.input_1,self.input_2, self.output, self.Q_1, self.Q_2 = self.network('network')
 
         self.input_target_1, self.input_target_2, self.output_target,self.Q_1_target, self.Q_2_target = self.network('target')
 
         self.train_step, self.action_target, self.y_target, self.loss_train = self.loss_and_train()
         self.saver, self.summary_placeholders, \
-        self.update_ops, self.summary_op, self.summary_writer = self.init_sess()
+        self.update_ops, self.summary_op, self.summary_writer = self.init()
 
         self.sess.run(tf.global_variables_initializer())
+        # check save
+        check_save = input('Load Model?(1=yes/2=no):')
+        if check_save == 1:
+            # restore variable from disk
+            load_path = input('Please input the model path:')
+            self.saver.restore(self.sess, load_path)
+            print("Model restored")
+
+            check_train = input("Prediction or training?(1=Inference/2=Training):")
+            if check_train == 1:
+                self.Num_Exploration = 0
+                self.Num_Training = 0
+
+    def test(self):
+        load_path = input("Please input the model path:")
+        self.saver.restore(self.sess, load_path)
+        states = self.initialization()
+        stacked_states = self.skip_and_stack_frame(states)
+        stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+        stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+        while self.step < self.Num_Testing:
+            if random.random() < 0.1:
+                act1 = random.randint(0, self.Num_action - 1)
+                act2 = random.randint(0, self.Num_action - 1)
+            else:
+                action_one_shot = self.output.eval(feed_dict={self.input_1:stacked_states[0],
+                                                              self.input_2:stacked_states[1]})
+                action_joint = np.argmax(action_one_shot)
+                act1 = int(action_joint / self.Num_action)
+                act2 = action_joint % self.Num_action
+            r1, r2 = self.env.move(act1, act2)
+            self.step += 1
+            agent1_state_pre, agent2_state_pre = self.env.get_states()
+            agent1_state = to_gray(agent1_state_pre)
+            agent2_state = to_gray(agent2_state_pre)
+            agent1_state_reshape = self.reshape_input(agent1_state)
+            agent2_state_reshape = self.reshape_input(agent2_state)
+            states = [agent1_state_reshape, agent2_state_reshape]
+            stacked_states = self.skip_and_stack_frame(states)
+            stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+            stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+            print("act1: %d, act2: %d" % (act1, act2))
+            print("r1: %d, r2: %d" % (r1, r2))
+            im = self.env.render_env()
+            plt.imshow(im)
+            plt.show(block=False)
+            plt.pause(0.1)
+            plt.clf()
+            terminal = False
+            if r1 == 5 or r2 == 5:
+                terminal = True
+            if terminal:
+                print('Step: ' + str(self.step) + ' / ' +
+                      'Episode: ' + str(self.episode) + ' / ' +
+                      'Progress: ' + self.progress + ' / ' +
+                      'Epsilon: ' + str(self.epsilon) + ' / ' +
+                      'Score: ' + str(self.score))
+                # If game is finished, initialize the state
+                states = self.initialization()
+                stacked_states = self.skip_and_stack_frame(states)
+                stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+                stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+                self.episode += 1
+
 
     def main(self):
         states = self.initialization()
@@ -165,14 +232,8 @@ class VDN(object):
                 print('Finished!')
                 break
 
-    def init_sess(self):
-        # initialize variables
-        # if USE_GPU:
-        #     config = tf.ConfigProto()
-        #     config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
-        #     sess = tf.InteractiveSession(config=config)
-        # else:
-        #     sess = tf.InteractiveSession()
+    def init(self):
+
 
         # make folder to save model
         save_path = './saved_models/'+ self.game_name + '/' + self.date_time
@@ -182,24 +243,7 @@ class VDN(object):
         summary_placeholdes, update_ops, summary_op = self.setup_summary()
         summary_writer = tf.summary.FileWriter(save_path, self.sess.graph)
 
-        # init = tf.local_variables_initializer()
-        # sess.run(init)
-
-        # Load the file if the saved file exists
         saver = tf.train.Saver()
-        # check save
-        check_save = input('Load Model?(1=yes/2=no):')
-        if check_save == 1:
-            # restore variable from disk
-            load_path = input('Please input the model path:')
-            saver.restore(sess, load_path)
-            print("Model restored")
-
-            check_train = input("Prediction or training?(1=Inference/2=Training):")
-            if check_train == 1:
-                self.Num_Exploration = 0
-                self.Num_Training = 0
-
         return saver, summary_placeholdes, update_ops, summary_op, summary_writer
 
     def initialization(self):
@@ -497,8 +541,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    agent.main()
-
+    # agent.main()
+    agent.test()
 
 
 

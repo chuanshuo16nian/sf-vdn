@@ -1,5 +1,5 @@
 
-Gamma = 0.99
+Gamma = 0.9
 Learnig_rate = 0.00025
 Epsilon = 1
 Final_epsilon = 0.1
