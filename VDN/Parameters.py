@@ -1,6 +1,6 @@
 
 Gamma = 0.9
-Learnig_rate = 0.00025
+Learnig_rate = 0.0001
 Epsilon = 1
 Final_epsilon = 0.1
 

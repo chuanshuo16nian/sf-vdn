@@ -3,7 +3,6 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime
-import time
 import os
 from PIL import Image
 import pylab
@@ -114,14 +113,14 @@ class VDN(object):
         self.sess.run(tf.global_variables_initializer())
         # check save
         check_save = input('Load Model?(1=yes/2=no):')
-        if check_save == 1:
+        if check_save == '1':
             # restore variable from disk
             load_path = input('Please input the model path:')
             self.saver.restore(self.sess, load_path)
             print("Model restored")
 
             check_train = input("Prediction or training?(1=Inference/2=Training):")
-            if check_train == 1:
+            if check_train == '1':
                 self.Num_Exploration = 0
                 self.Num_Training = 0
 
@@ -140,7 +139,7 @@ class VDN(object):
                 action_one_shot = self.output.eval(feed_dict={self.input_1:stacked_states[0],
                                                               self.input_2:stacked_states[1]})
                 action_joint = np.argmax(action_one_shot)
-                act1 = int(action_joint / self.Num_action)
+                act1 = action_joint // self.Num_action
                 act2 = action_joint % self.Num_action
             r1, r2 = self.env.move(act1, act2)
             self.step += 1
@@ -541,8 +540,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    # agent.main()
-    agent.test()
+    agent.main()
+    # agent.test()
 
 
 
