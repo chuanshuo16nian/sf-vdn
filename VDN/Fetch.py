@@ -201,6 +201,11 @@ class GameEnv:
         assert agent1_action in range(8), 'agent1 take wrong action'
         assert agent2_action in range(8), 'agent2 take wrong action'
 
+        if agent1_action == 4:
+            agent1_action = 7
+        if agent2_action == 4:
+            agent2_action = 7
+
         agent1_old_x, agent1_old_y = self.agent1.x, self.agent1.y
         agent2_old_x, agent2_old_y = self.agent2.x, self.agent2.y
 

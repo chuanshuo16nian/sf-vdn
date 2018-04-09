@@ -17,7 +17,7 @@ def to_gray(state):
 
 
 game = 'Fetch'
-USE_GPU = True
+USE_GPU = False
 
 
 class VDN(object):
@@ -132,7 +132,7 @@ class VDN(object):
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.1:
+            if random.random() < 0.0:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
@@ -161,7 +161,7 @@ class VDN(object):
             plt.clf()
             terminal = False
             if r1 == 5 or r2 == 5:
-                terminal = True
+                terminal = False
             if terminal:
                 print('Step: ' + str(self.step) + ' / ' +
                       'Episode: ' + str(self.episode) + ' / ' +
@@ -193,7 +193,7 @@ class VDN(object):
             next_states_pre = self.env.get_states()
             next_states = [to_gray(next_states_pre[0]), to_gray(next_states_pre[1])]
             if r1 ==5 or r2 == 5:
-                terminal = True
+                terminal = False
             else:
                 terminal = False
             next_states= [self.reshape_input(next_states[0]), self.reshape_input(next_states[1])]
@@ -221,6 +221,13 @@ class VDN(object):
 
             # Plotting
             self.plotting(terminal)
+
+            if self.step % 50000 == 0:
+                print('Step: ' + str(self.step) + ' / ' +
+                      'Episode: ' + str(self.episode) + ' / ' +
+                      'Progress: ' + self.progress + ' / ' +
+                      'Epsilon: ' + str(self.epsilon) + ' / ' +
+                      'Score: ' + str(self.score))
 
             # If game is over(terminal)
             if terminal:
@@ -393,20 +400,24 @@ class VDN(object):
             action_2[action_2_index] = 1
         elif self.progress == 'Training':
             if random.random() < self.epsilon:
-                # choose random action
+                # choose random action1
                 action_1_index = random.randint(0, self.Num_action - 1)
                 action_1[action_1_index] = 1
-                action_2_index = random.randint(0, self.Num_action - 1)
-                action_2[action_2_index] = 1
             else:
-                # choose greedy action
+                # choose greedy action1
                 Q_1_value = self.Q_1.eval(feed_dict={self.input_1:[stack_state_1]})
                 action_1_index = np.argmax(Q_1_value)
                 action_1[action_1_index] = 1
+
+            if random.random() < self.epsilon:
+                # choose random action2
+                action_2_index = random.randint(0, self.Num_action - 1)
+                action_2[action_2_index] = 1
+            else:
+                # choose greedy action2
                 Q_2_value = self.Q_2.eval(feed_dict={self.input_2: [stack_state_2]})
                 action_2_index = np.argmax(Q_2_value)
                 action_2[action_2_index] = 1
-                self.maxQ = np.max(Q_1_value + Q_2_value)
 
             # Decrease epsilon while training
             if self.epsilon > self.final_epsilon:
@@ -540,8 +551,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    agent.main()
-    # agent.test()
+    # agent.main()
+    agent.test()
 
 
 

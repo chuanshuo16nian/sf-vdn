@@ -4,19 +4,19 @@ Learnig_rate = 0.0001
 Epsilon = 1
 Final_epsilon = 0.1
 
-Num_action = 8
-Num_replay_memory = 50000
-Num_start_training = 50000
+Num_action = 5
+Num_replay_memory = 5000
+Num_start_training = 5000
 Num_training = 7000000
 Num_update = 5000
-Num_batch = 32
-Num_test = 100000
+Num_batch = 64
+Num_test = 10000
 Num_skipFrame = 1
 Num_stackFrame = 4
 # Num_colorChannel =1
 Num_plot_episode = 10
 
-GPU_fraction = 0.9
+GPU_fraction = 0.2
 Is_train = True
 #Load_path = ''
 
