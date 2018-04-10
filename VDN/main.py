@@ -8,7 +8,7 @@ from PIL import Image
 import pylab
 import Parameters
 from Fetch import GameEnv
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 def to_gray(state):
     im = Image.fromarray(np.uint8(state * 255))
@@ -41,7 +41,7 @@ class VDN(object):
         self.Num_Training = Parameters.Num_training
         self.Num_Testing = Parameters.Num_test
 
-        self.learning_rate = Parameters.Learnig_rate
+        self.learning_rate = Parameters.Learning_rate
         self.gamma = Parameters.Gamma
 
         self.first_epsilon = Parameters.Epsilon
@@ -174,7 +174,6 @@ class VDN(object):
                 stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
                 stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
                 self.episode += 1
-
 
     def main(self):
         states = self.initialization()
@@ -502,7 +501,7 @@ class VDN(object):
 
     def save_model_backup(self):
         # Save the variables to disk.
-        if self.step == 51000 or self.step % 140000 == 0:
+        if self.step == 51000 or self.step % 100000 == 0:
             save_path = self.saver.save(self.sess, '/home/admin1/zp/VDN/saved_models/' + self.game_name +
                                         '/' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "/model.ckpt")
             print("Model saved in file: %s" % save_path)
@@ -551,8 +550,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    # agent.main()
-    agent.test()
+    agent.main()
+    # agent.test()
 
 
 

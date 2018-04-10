@@ -43,7 +43,7 @@ class VDN(object):
         self.Num_Training = Parameters2.Num_training
         self.Num_Testing = Parameters2.Num_test
 
-        self.learning_rate = Parameters2.Learnig_rate
+        self.learning_rate = Parameters2.Learning_rate
         self.gamma = Parameters2.Gamma
 
         self.first_epsilon = Parameters2.Epsilon
