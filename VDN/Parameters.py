@@ -1,13 +1,13 @@
 
 Gamma = 0.99
 Learning_rate = 0.00025
-Epsilon = 1
+Epsilon = 0.27857
 Final_epsilon = 0.1
 
 Num_action = 5
 Num_replay_memory = 50000
 Num_start_training = 50000
-Num_training = 7000000
+Num_training = 5000000
 Num_update = 5000
 Num_batch = 32
 Num_test = 10000
