@@ -550,8 +550,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    # agent.main()
-    agent.test()
+    agent.main()
+    # agent.test()
 
 
 

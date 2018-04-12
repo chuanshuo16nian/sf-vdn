@@ -220,7 +220,11 @@ class GameEnv:
 
         agent2_action_return = self.agent2_actions[agent2_action](env=self)#_x_size=self.size_x, env_y_size=self.size_y)
         self.agent2_beam_set = [] if agent2_action != 6 else agent2_action_return
-
+        if self.agent1.x == agent2_old_x and self.agent1.y == agent2_old_y \
+           and \
+           self.agent2.x == agent1_old_x and self.agent2.y == agent1_old_y:
+            self.agent1.x, self.agent1.y = agent1_old_x, agent1_old_y
+            self.agent2.x, self.agent2.y = agent2_old_x, agent2_old_y
         if self.agent1.x == self.agent2.x and self.agent1.y == self.agent2.y:
             self.agent1.x, self.agent1.y = agent1_old_x, agent1_old_y
             self.agent2.x, self.agent2.y = agent2_old_x, agent2_old_y
