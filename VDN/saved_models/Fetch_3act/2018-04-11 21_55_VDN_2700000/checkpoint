@@ -1,0 +1,6 @@
+model_checkpoint_path: "F://bs//sf-vdn//VDN//saved_models//Fetch_3act//2018-04-11 21_55_VDN_2700000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN//saved_models//Fetch_3act//2018-04-11 21_55_VDN_2300000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN//saved_models//Fetch_3act//2018-04-11 21_55_VDN_2400000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN//saved_models//Fetch_3act//2018-04-11 21_55_VDN_2500000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN//saved_models//Fetch_3act//2018-04-11 21_55_VDN_2600000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN//saved_models//Fetch_3act//2018-04-11 21_55_VDN_2700000//model.ckpt"

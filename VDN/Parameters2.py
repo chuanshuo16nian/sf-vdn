@@ -1,13 +1,13 @@
 class Parameters(object):
     Gamma = 0.99
     Learning_rate = 0.00025
-    Epsilon = 1
+    Epsilon = 0.59
     Final_epsilon = 0.1
 
     Num_action = 3
     Num_replay_memory = 100000
     Num_start_training = 100000
-    Num_training = 10000000
+    Num_training = 5800000
     Num_update = 10000
     Num_batch = 32
     Num_test = 10000

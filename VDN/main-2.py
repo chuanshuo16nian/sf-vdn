@@ -8,7 +8,7 @@ from PIL import Image
 import pylab
 from Parameters2 import Parameters
 from Fetch_3act import GameEnv
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 def to_gray(state):
     im = Image.fromarray(np.uint8(state * 255))
@@ -18,7 +18,7 @@ def to_gray(state):
 
 game = 'Fetch_3act'
 USE_GPU = False
-
+base_path = 'F://bs//sf-vdn//VDN//saved_models//'
 
 class VDN(object):
     def __init__(self):
@@ -132,7 +132,7 @@ class VDN(object):
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.2:
+            if random.random() < 0.0:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
@@ -241,7 +241,7 @@ class VDN(object):
 
 
         # make folder to save model
-        save_path = './saved_models/'+ self.game_name + '/' + self.date_time
+        save_path = '/saved_models/'+ self.game_name + '/' + self.date_time
         os.makedirs(save_path)
 
         # Summary for tensorboard
@@ -495,15 +495,15 @@ class VDN(object):
     def save_model(self):
         # Save the variables to disk.
         if self.step == self.Num_Exploration + self.Num_Training:
-            save_path = self.saver.save(self.sess, '/home/admin1/zp/VDN/saved_models/' + self.game_name +
-                                        '/' + self.date_time +  '_' + self.algorithm + "/model.ckpt")
+            save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                        '//' + self.date_time +  '_' + self.algorithm + "//model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def save_model_backup(self):
         # Save the variables to disk.
         if self.step == 51000 or self.step % 100000 == 0:
-            save_path = self.saver.save(self.sess, '/home/admin1/zp/VDN/saved_models/' + self.game_name +
-                                        '/' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "/model.ckpt")
+            save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                        '//' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "//model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def plotting(self, terminal):
@@ -550,8 +550,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    agent.main()
-    # agent.test()
+    # agent.main()
+    agent.test()
 
 
 
