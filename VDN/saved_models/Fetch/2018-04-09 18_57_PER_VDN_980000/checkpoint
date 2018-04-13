@@ -1,6 +1,0 @@
-model_checkpoint_path: "/home/admin1/zp/VDN/saved_models/Fetch/2018-04-09 18_57_PER_VDN_980000/model.ckpt"
-all_model_checkpoint_paths: "/home/admin1/zp/VDN/saved_models/Fetch/2018-04-09 18_57_PER_VDN_420000/model.ckpt"
-all_model_checkpoint_paths: "/home/admin1/zp/VDN/saved_models/Fetch/2018-04-09 18_57_PER_VDN_560000/model.ckpt"
-all_model_checkpoint_paths: "/home/admin1/zp/VDN/saved_models/Fetch/2018-04-09 18_57_PER_VDN_700000/model.ckpt"
-all_model_checkpoint_paths: "/home/admin1/zp/VDN/saved_models/Fetch/2018-04-09 18_57_PER_VDN_840000/model.ckpt"
-all_model_checkpoint_paths: "/home/admin1/zp/VDN/saved_models/Fetch/2018-04-09 18_57_PER_VDN_980000/model.ckpt"

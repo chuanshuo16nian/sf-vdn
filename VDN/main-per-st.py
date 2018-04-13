@@ -6,7 +6,7 @@ import datetime
 import os
 from PIL import Image
 import pylab
-import Parameters2
+import Parameters
 from Fetch import GameEnv
 from SumTree import SumTree
 
@@ -29,7 +29,7 @@ class VDN(object):
         self.game_name = game
         self.env = GameEnv()
         self.progress = ''
-        self.Num_action = Parameters2.Num_action ######################
+        self.Num_action = Parameters.Num_action ######################
 
         self.Num_replay_episode = 500
         self.step_size = 6
@@ -39,20 +39,20 @@ class VDN(object):
         self.episode_memory = []
 
         # Initialize Parameters2
-        self.Num_Exploration = Parameters2.Num_start_training
-        self.Num_Training = Parameters2.Num_training
-        self.Num_Testing = Parameters2.Num_test
+        self.Num_Exploration = Parameters.Num_start_training
+        self.Num_Training = Parameters.Num_training
+        self.Num_Testing = Parameters.Num_test
 
-        self.learning_rate = Parameters2.Learning_rate
-        self.gamma = Parameters2.Gamma
+        self.learning_rate = Parameters.Learning_rate
+        self.gamma = Parameters.Gamma
 
-        self.first_epsilon = Parameters2.Epsilon
-        self.final_epsilon = Parameters2.Final_epsilon
-        self.epsilon = Parameters2.Epsilon
+        self.first_epsilon = Parameters.Epsilon
+        self.final_epsilon = Parameters.Final_epsilon
+        self.epsilon = Parameters.Epsilon
 
-        self.Num_plot_episode = Parameters2.Num_plot_episode
+        self.Num_plot_episode = Parameters.Num_plot_episode
 
-        self.Is_train = Parameters2.Is_train
+        self.Is_train = Parameters.Is_train
         # self.Load_path = Parameters2.Load_path
 
         self.step = 1
@@ -75,27 +75,27 @@ class VDN(object):
 
         # Parameters2 for skip and stack
         self.state_set = []
-        self.Num_skipping = Parameters2.Num_skipFrame
-        self.Num_stacking = Parameters2.Num_stackFrame
+        self.Num_skipping = Parameters.Num_skipFrame
+        self.Num_stacking = Parameters.Num_stackFrame
 
         # Parameters2 for experience replay
-        self.Num_replay_memory = Parameters2.Num_replay_memory
-        self.Num_batch = Parameters2.Num_batch
+        self.Num_replay_memory = Parameters.Num_replay_memory
+        self.Num_batch = Parameters.Num_batch
         self.replay_memory = SumTree(self.Num_replay_memory)
 
         # Parameters2 for target network
-        self.Num_update_target = Parameters2.Num_update
+        self.Num_update_target = Parameters.Num_update
 
         # Parameters2 for network
-        self.input_size = Parameters2.Input_size
+        self.input_size = Parameters.Input_size
         # self.Num_colorChannel = Parameters2.Num_colorChannel
 
-        self.first_dense = Parameters2.first_dense
-        self.first_LSTM =Parameters2.first_LSTM
-        self.second_dense = Parameters2.second_dense
-        self.output_dense = Parameters2.output_dense
+        self.first_dense = Parameters.first_dense
+        self.first_LSTM =Parameters.first_LSTM
+        self.second_dense = Parameters.second_dense
+        self.output_dense = Parameters.output_dense
 
-        self.GPU_fraction = Parameters2.GPU_fraction
+        self.GPU_fraction = Parameters.GPU_fraction
 
         # Variables for tensorboard
         self.loss = 0

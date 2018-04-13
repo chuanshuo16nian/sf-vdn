@@ -8,7 +8,7 @@ from PIL import Image
 import pylab
 import Parameters1
 from Fetch import GameEnv
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 def to_gray(state):
     im = Image.fromarray(np.uint8(state * 255))
@@ -23,7 +23,7 @@ USE_GPU = False
 class VDN(object):
     def __init__(self):
 
-        self.algorithm = 'PER_VDN'
+        self.algorithm = 'VDN'
         self.game_name = game
         self.env = GameEnv()
         self.progress = ''
@@ -56,15 +56,6 @@ class VDN(object):
         self.step = 1
         self.score = 0
         self.episode = 0
-
-        # ###################P E R########################
-        self.eps = 0.00001
-        self.alpha = 0.6
-        self.beta_init = 0.4
-        self.beta = self.beta_init
-
-        self.TD_list = np.array([])
-        # ################################################
 
         # Training time
         self.date_time = str(datetime.date.today()) + ' ' + \
@@ -106,21 +97,16 @@ class VDN(object):
         # Initialize Network
         if USE_GPU:
             config = tf.ConfigProto()
-            # config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
+            config.gpu_options.per_process_gpu_memory_fraction = self.GPU_fraction
             config.log_device_placement = False
             self.sess = tf.InteractiveSession(config=config)
         else:
             self.sess = tf.InteractiveSession()
+        self.input_1,self.input_2, self.output, self.Q_1, self.Q_2 = self.network('network')
 
-        self.input_1,self.input_2, self.output, \
-        self.Q_1, self.Q_2 = self.network('network')
+        self.input_target_1, self.input_target_2, self.output_target,self.Q_1_target, self.Q_2_target = self.network('target')
 
-        self.input_target_1, self.input_target_2, self.output_target, \
-        self.Q_1_target, self.Q_2_target = self.network('target')
-
-        self.train_step, self.action_target, self.y_target, \
-        self.loss_train, self.w_is, self.TD_error = self.loss_and_train()
-
+        self.train_step, self.action_target, self.y_target, self.loss_train = self.loss_and_train()
         self.saver, self.summary_placeholders, \
         self.update_ops, self.summary_op, self.summary_writer = self.init()
 
@@ -146,7 +132,7 @@ class VDN(object):
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.0:
+            if random.random() < 0.2:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
@@ -174,8 +160,8 @@ class VDN(object):
             plt.pause(0.1)
             plt.clf()
             terminal = False
-            # if r1 == 5 or r2 == 5:
-            #     terminal = True
+            if r1 == 5 or r2 == 5:
+                terminal = False
             if terminal:
                 print('Step: ' + str(self.step) + ' / ' +
                       'Episode: ' + str(self.episode) + ' / ' +
@@ -188,7 +174,6 @@ class VDN(object):
                 stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
                 stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
                 self.episode += 1
-
 
     def main(self):
         states = self.initialization()
@@ -221,11 +206,9 @@ class VDN(object):
                 # Update target network
                 if self.step % self.Num_update_target == 0:
                     self.update_target()
-                # #################P E R###################
-                minibatch, w_batch, batch_index = self.prioritized_minibatch()
-                # #########################################
+
                 # train
-                self.train(minibatch, w_batch, batch_index)
+                self.train(self.replay_memory)
 
                 self.save_model()
                 self.save_model_backup()
@@ -396,17 +379,10 @@ class VDN(object):
         y_target = tf.placeholder(tf.float32, shape=[None])
 
         y_prediction = tf.reduce_sum(tf.multiply(self.output, action_target), reduction_indices=1)
-        # Loss = tf.reduce_mean(tf.square (y_prediction - y_target))
-
-        # #################P E R#########################
-        w_is = tf.placeholder(tf.float32, shape=[None])
-        TD_error_tf = tf.subtract(y_prediction, y_target)
-
-        Loss = tf.reduce_sum(tf.multiply(w_is, tf.square(y_prediction - y_target)))
-        # ###############################################
+        Loss = tf.reduce_mean(tf.square (y_prediction - y_target))
         train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss)
 
-        return train_step, action_target, y_target, Loss, w_is, TD_error_tf
+        return train_step, action_target, y_target, Loss
 
 
     def select_action(self, stack_state_1, stack_state_2):
@@ -463,28 +439,8 @@ class VDN(object):
         # If replay memory is full, delete the oldest experience
         if len(self.replay_memory) >= self.Num_replay_memory:
             del self.replay_memory[0]
-            self.TD_list = np.delete(self.TD_list, 0)
-        if self.progress == 'Exploring':
-            self.replay_memory.append([state, action, reward, next_state, terminal])
-            self.TD_list = np.append(self.TD_list, pow(abs(reward) + self.eps, self.alpha))
-        elif self.progress == 'Training':
-            self.replay_memory.append([state, action, reward, next_state, terminal])
-            # ##########################P E R##############################
-            Q = self.output_target.eval(feed_dict={self.input_target_1:[next_state[0]],
-                                                   self.input_target_2:[next_state[1]]})
-            if terminal == True:
-                y = [reward]
-            else:
-                y = [reward + self.gamma * np.max(Q)]
-            act = np.zeros([self.Num_action * self.Num_action])
-            act[action[0] * self.Num_action + action[1]] = 1
-            TD_error = self.TD_error.eval(feed_dict={self.action_target: [act],
-                                                     self.y_target:y,
-                                                     self.input_1:[state[0]],
-                                                     self.input_2:[state[1]]})[0]
 
-            self.TD_list = np.append(self.TD_list, pow((abs(TD_error) + self.eps), self.alpha))
-            # #############################################################
+        self.replay_memory.append([state, action, reward, next_state, terminal])
 
     def update_target(self):
         # Get trainable variables
@@ -498,32 +454,10 @@ class VDN(object):
         for i in range(len(trainable_variables_network)):
             self.sess.run(tf.assign(trainable_variables_target[i], trainable_variables_network[i]))
 
-    # ###################################P E R###################################
-    def prioritized_minibatch(self):
-        # update TD_error list
-        TD_normalized = self.TD_list / np.linalg.norm(self.TD_list, 1)
-        TD_sum = np.cumsum(TD_normalized)
+    def train(self, replay_memory):
 
-        # Get importance sampling weights
-        weight_is = np.power((self.Num_replay_memory * TD_normalized), -self.beta)
-        weight_is = weight_is / np.max(weight_is)
-
-        # select mini batch and importance sampling weights
-        minibatch = []
-        batch_index = []
-        w_batch = []
-        for i in range(self.Num_batch):
-            rand_batch = random.random()
-            TD_index = np.nonzero(TD_sum >= rand_batch)[0][0]
-            batch_index.append(TD_index)
-            w_batch.append((weight_is[TD_index]))
-            minibatch.append(self.replay_memory[TD_index])
-
-        return minibatch, w_batch, batch_index
-    # ###########################################################################
-
-    def train(self, minibatch, w_batch, batch_index):
-
+        # Sample from replay memory
+        minibatch = random.sample(replay_memory, self.Num_batch)
 
         # save the each batch data
         state_1_batch = [batch[0][0] for batch in minibatch]
@@ -552,18 +486,11 @@ class VDN(object):
                 y_batch.append(reward_batch[i])
             else:
                 y_batch.append(reward_batch[i] + self.gamma * np.max(Q_batch[i]))
-        _, self.loss, TD_error_batch = self.sess.run([self.train_step, self.loss_train, self.TD_error],
-                                                     feed_dict={self.action_target:action_batch,
-                                                                self.y_target:y_batch,
-                                                                self.input_1:state_1_batch,
-                                                                self.input_2:state_2_batch,
-                                                                self.w_is: w_batch})
-        # update TD_list
-        for i_batch in range(len(batch_index)):
-            self.TD_list[batch_index[i_batch]] = pow((abs(TD_error_batch[i_batch]) + self.eps), self.alpha)
-
-        # update beta
-        self.beta = self.beta + (1 - self.beta_init) / self.Num_Training
+        _, self.loss = self.sess.run([self.train_step, self.loss_train],
+                                     feed_dict={self.action_target:action_batch,
+                                                self.y_target:y_batch,
+                                                self.input_1:state_1_batch,
+                                                self.input_2:state_2_batch})
 
     def save_model(self):
         # Save the variables to disk.
@@ -574,7 +501,7 @@ class VDN(object):
 
     def save_model_backup(self):
         # Save the variables to disk.
-        if self.step == 51000 or self.step % 140000 == 0:
+        if self.step == 51000 or self.step % 100000 == 0:
             save_path = self.saver.save(self.sess, '/home/admin1/zp/VDN/saved_models/' + self.game_name +
                                         '/' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "/model.ckpt")
             print("Model saved in file: %s" % save_path)
@@ -623,8 +550,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    # agent.main()
-    agent.test()
+    agent.main()
+    # agent.test()
 
 
 
