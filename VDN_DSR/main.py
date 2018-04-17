@@ -80,9 +80,8 @@ class VDN(object):
         # self.Num_colorChannel = Parameters.Num_colorChannel
 
         self.first_dense = Parameters.first_dense
-        self.first_LSTM =Parameters.first_LSTM
-        self.second_dense = Parameters.second_dense
-        self.output_dense = Parameters.output_dense
+        self.decoder_dense = Parameters.decoder_dense
+        self.reward_weight = Parameters.reward_weight
 
         self.GPU_fraction = Parameters.GPU_fraction
 
@@ -373,6 +372,25 @@ class VDN(object):
             Q_joint = tf.add(tmp1, tmp2)
 
             return x_1, x_2, Q_joint, Q_1, Q_2
+
+    def dsr_net(self, network_name):
+        x = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
+        x_norm = (x - (255.0 / 2)) / (255.0 / 2)
+        with tf.variable_scope(network_name):
+            w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
+            b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
+
+            h_fc1 = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
+
+            w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
+            b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
+
+            autoencoder_out = tf.matmul(h_fc1, w_decoder) + b_decoder
+
+            reward_weight = self.weight_variable(network_name + 'reward_weight', self.reward_weight)
+            reward_estimator = tf.matmul(h_fc1, reward_weight)
+
+
 
     def loss_and_train(self):
         action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
