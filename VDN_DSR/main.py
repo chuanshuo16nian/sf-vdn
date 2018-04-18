@@ -82,6 +82,9 @@ class VDN(object):
         self.first_dense = Parameters.first_dense
         self.decoder_dense = Parameters.decoder_dense
         self.reward_weight = Parameters.reward_weight
+        self.fai_first_dense = Parameters.fai_first_dense
+        self.fai_second_dense = Parameters.fai_second_dense
+        self.fai_out_dense = Parameters.fai_out_dense
 
         self.GPU_fraction = Parameters.GPU_fraction
 
@@ -101,9 +104,13 @@ class VDN(object):
             self.sess = tf.InteractiveSession(config=config)
         else:
             self.sess = tf.InteractiveSession()
-        self.input_1,self.input_2, self.output, self.Q_1, self.Q_2 = self.network('network')
 
-        self.input_target_1, self.input_target_2, self.output_target,self.Q_1_target, self.Q_2_target = self.network('target')
+        self.input_1,self.input_2, self.autoencoder_out_1, self.autoencoder_out_2, self.reward_estimator_1, \
+        self.reward_estimator_2, self.fai_1, self.fai_2, self.state_feature_1, self.state_feature_2 = self.network('network')
+
+        self.input_target_1, self.input_target_2, self.autoencoder_out_target_1, self.autoencoder_out_target_2, \
+        self.reward_estimator_target_1, self.reward_estimator_target_2, self.fai_target_1, self.fai_target_2, \
+        self.state_feature_target_1, self.state_feature_target_2 = self.network('target')
 
         self.train_step, self.action_target, self.y_target, self.loss_train = self.loss_and_train()
         self.saver, self.summary_placeholders, \
@@ -308,100 +315,103 @@ class VDN(object):
 
         return summary_placeholders, update_ops, summary_op
 
-    # Convolution
-    # def conv2d(self, x, w, stride):
-    #   return tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME')
-
-    # Get Variables
-    # def conv_weight_variable(self, name, shape):
-    #    return tf.get_variable(name, shape = shape, initializer = tf.contrib.layers.xavier_initializer_conv2d())
-
     def weight_variable(self, name, shape):
         return tf.get_variable(name, shape = shape, initializer = tf.contrib.layers.xavier_initializer())
 
     def bias_variable(self, name, shape):
         return tf.get_variable(name, shape = shape, initializer = tf.contrib.layers.xavier_initializer())
 
-    def network(self, network_name):
-        # input
-        x_1 = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
-        x_2 = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
-
-        x_1_norm = (x_1 - (255.0 / 2)) / (255.0 / 2)
-        x_2_norm = (x_2 - (255.0 / 2)) / (255.0 / 2)
-
-        # cell = tf.contrib.rnn.BasicLSTMCell(num_units=self.lstm_size, state_is_tuple=True)
-
-        with tf.variable_scope(network_name):
-
-            # fc1 weights
-            w_fc1_1 = self.weight_variable(network_name + 'w_fc1_1', self.first_dense)
-            b_fc1_1 = self.bias_variable(network_name + 'b_fc1_1', [self.first_dense[1]])
-            w_fc1_2 = self.weight_variable(network_name + 'w_fc1_2', self.first_dense)
-            b_fc1_2 = self.bias_variable(network_name + 'b_fc1_2', [self.first_dense[1]])
-            # fc2 weight2
-            w_fc2_1 = self.weight_variable(network_name + 'w_fc2_1', self.second_dense)
-            b_fc2_1 = self.bias_variable(network_name + 'b_fc2_1', [self.second_dense[1]])
-            w_fc2_2 = self.weight_variable(network_name + 'w_fc2_2', self.second_dense)
-            b_fc2_2 = self.bias_variable(network_name + 'b_fc2_2', [self.second_dense[1]])
-            # output layer weights
-            w_out_1 = self.weight_variable(network_name + 'w_out_1', self.output_dense)
-            b_out_1 = self.bias_variable(network_name + 'b_out_1', [self.output_dense[1]])
-            w_out_2 = self.weight_variable(network_name + 'w_out_2', self.output_dense)
-            b_out_2 = self.bias_variable(network_name + 'b_out_2', [self.output_dense[1]])
-
-            # network
-            h_fc1_1 = tf.nn.relu(tf.matmul(x_1_norm, w_fc1_1) + b_fc1_1)
-            h_fc1_2 = tf.nn.relu(tf.matmul(x_2_norm, w_fc1_2) + b_fc1_2)
-
-            h_fc2_1 = tf.nn.relu(tf.matmul(h_fc1_1, w_fc2_1) + b_fc2_1)
-            h_fc2_2 = tf.nn.relu(tf.matmul(h_fc1_2, w_fc2_2) + b_fc2_2)
-
-            Q_1 = tf.matmul(h_fc2_1, w_out_1) + b_out_1
-            Q_2 = tf.matmul(h_fc2_2, w_out_2) + b_out_2
-            # compute joint Q
-            tmp1 = []
-            l = tf.reshape(Q_1, [-1])
-            for i in range(self.Num_action):
-                tmp1.append(l)
-            tmp1 = tf.transpose(tmp1, [1, 0])
-            tmp1 = tf.reshape(tmp1, [-1, self.Num_action * self.Num_action])
-            tmp2 = Q_2
-            for i in range(self.Num_action - 1):
-                tmp2 = tf.concat([tmp2, Q_2], 1)
-            Q_joint = tf.add(tmp1, tmp2)
-
-            return x_1, x_2, Q_joint, Q_1, Q_2
-
-    def dsr_net(self, network_name):
+    def _dsr_net(self, network_name):
         x = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
         x_norm = (x - (255.0 / 2)) / (255.0 / 2)
         with tf.variable_scope(network_name):
             w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
             b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
 
-            h_fc1 = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
+            state_feature = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
 
             w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
             b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
 
-            autoencoder_out = tf.matmul(h_fc1, w_decoder) + b_decoder
+            autoencoder_out = tf.matmul(state_feature, w_decoder) + b_decoder
 
             reward_weight = self.weight_variable(network_name + 'reward_weight', self.reward_weight)
-            reward_estimator = tf.matmul(h_fc1, reward_weight)
 
+            reward_estimator = tf.matmul(state_feature, reward_weight)
 
+            fai = []
+            for i in range(self.Num_action):
+                fai.append(self._fai_net(network_name, state_feature))
+
+            return x, autoencoder_out, reward_estimator, fai, state_feature
+
+    def _fai_net(self, network_name, state_feature):
+        fai_w_fc1 = self.weight_variable(network_name + 'fai_w_fc1', self.fai_first_dense)
+        fai_b_fc1 = self.bias_variable(network_name + 'fai_b_fc1', self.fai_first_dense[1])
+
+        fai_h_fc1 = tf.nn.relu(tf.matmul(state_feature, fai_w_fc1) + fai_b_fc1)
+
+        fai_w_fc2 = self.weight_variable(network_name + 'fai_w_fc2', self.fai_second_dense)
+        fai_b_fc2 = self.weight_variable(network_name + 'fai_b_fc2', self.fai_second_dense[1])
+
+        fai_h_fc2 = tf.nn.relu(tf.matmul(fai_h_fc1, fai_w_fc2) + fai_b_fc2)
+
+        fai_w_out = self.weight_variable(network_name + 'fai_w_out', self.fai_out_dense)
+        fai_b_out = self.weight_variable(network_name + 'fai_b_out', self.fai_out_dense[1])
+
+        fai_net_out = tf.matmul(fai_h_fc2, fai_w_out) + fai_b_out
+
+        return fai_net_out
+
+    def network(self, network_name):
+        with tf.variable_scope(network_name):
+            x_1, autoencoder_out_1, reward_estimator_1, fai_1, state_feature_1 = self._dsr_net('agt1_dsrnet')
+            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2 = self._dsr_net('agt1_dsrnet')
+
+            # compute joint Q
+            # tmp1 = []
+            # l = tf.reshape(Q_1, [-1])
+            # for i in range(self.Num_action):
+            #     tmp1.append(l)
+            # tmp1 = tf.transpose(tmp1, [1, 0])
+            # tmp1 = tf.reshape(tmp1, [-1, self.Num_action * self.Num_action])
+            # tmp2 = Q_2
+            # for i in range(self.Num_action - 1):
+            #     tmp2 = tf.concat([tmp2, Q_2], 1)
+            # Q_joint = tf.add(tmp1, tmp2)
+
+            return x_1, x_2, autoencoder_out_1, autoencoder_out_2, reward_estimator_1, reward_estimator_2, \
+                   fai_1, fai_2, state_feature_1, state_feature_2
 
     def loss_and_train(self):
-        action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
-        y_target = tf.placeholder(tf.float32, shape=[None])
+        # action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
+        fai_1_target = tf.placeholder(tf.float32, shape=[None, 64])
+        fai_2_target = tf.placeholder(tf.float32, shape=[None, 64])
+        Loss_fai_1 = []
+        Loss_fai_2 = []
+        train_fai_1 = []
+        train_fai_2 = []
+        for act in range(self.Num_action):
+            fai_1_prediction = self.fai_1[act]
+            fai_2_prediction = self.fai_2[act] # tf.reduce_sum(tf.multiply(self.output, action_target), reduction_indices=1)
+            loss1 = tf.reduce_mean(tf.square(fai_1_prediction - fai_1_target))
+            loss2 = tf.reduce_mean(tf.square(fai_2_prediction - fai_2_target))
+            Loss_fai_1.append(loss1)
+            Loss_fai_2.append(loss2)
+            train_fai_1.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss1))
+            train_fai_2.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss2))
 
-        y_prediction = tf.reduce_sum(tf.multiply(self.output, action_target), reduction_indices=1)
-        Loss = tf.reduce_mean(tf.square (y_prediction - y_target))
-        train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss)
+        r_1_target = tf.placeholder(tf.float32, shape=[None])
+        r_2_target = tf.placeholder(tf.float32, shape=[None])
+        Loss_r_1 = tf.reduce_mean(tf.square(r_1_target - self.reward_estimator_1))
+        Loss_r_2 = tf.reduce_mean(tf.square(r_2_target - self.reward_estimator_2))
+        Loss_autoencoder_1 = tf.reduce_mean(tf.square(self.input_1 - self.autoencoder_out_1))
+        Loss_autoencoder_2 = tf.reduce_mean(tf.square(self.input_2 - self.autoencoder_out_2))
+        Loss_sum_1 = Loss_r_1 + Loss_autoencoder_1
+        Loss_sum_2 = Loss_r_2 + Loss_autoencoder_2
 
-        return train_step, action_target, y_target, Loss
-
+        return fai_1_target, fai_2_target, train_fai_1, train_fai_2, Loss_fai_1, Loss_fai_2, \
+               r_1_target, r_2_target,
 
     def select_action(self, stack_state_1, stack_state_2):
         action_1 = np.zeros([self.Num_action])

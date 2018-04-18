@@ -26,3 +26,7 @@ class Parameters(object):
     first_dense = [Input_size, 64]
     decoder_dense = [64, Input_size]
     reward_weight = [64, 1]
+
+    fai_first_dense = [64, 64]
+    fai_second_dense = [64, 32]
+    fai_out_dense = [32,64]
