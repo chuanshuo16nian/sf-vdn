@@ -15,6 +15,9 @@ class Parameters(object):
     Num_stackFrame = 4
     # Num_colorChannel =1
     Num_plot_episode = 10
+    Num_rdatabase = 4000
+    r_batch_size = 4000
+
 
     GPU_fraction = 0.2
     Is_train = True
