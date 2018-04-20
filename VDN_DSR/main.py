@@ -152,11 +152,23 @@ class VDN(object):
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
-                action_one_shot = self.output.eval(feed_dict={self.input_1:stacked_states[0],
-                                                              self.input_2:stacked_states[1]})
-                action_joint = np.argmax(action_one_shot)
-                act1 = action_joint // self.Num_action
-                act2 = action_joint % self.Num_action
+                # choose greedy action1
+                st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
+                fai_1 = []
+                for i in range(self.Num_action):
+                    fai_1.append(self.fai_1[i].eval(feed_dict={self.fai_input_1: st1}))
+                q_1 = []
+                for i in range(self.Num_action):
+                    q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1: fai_1[i]}))
+                act1 = np.argmax(q_1)
+                st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+                fai_2 = []
+                for i in range(self.Num_action):
+                    fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+                q_2 = []
+                for i in range(self.Num_action):
+                    q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+                act2 = np.argmax(q_2)
             r1, r2 = self.env.move(act1, act2)
             self.step += 1
             agent1_state_pre, agent2_state_pre = self.env.get_states()
@@ -615,7 +627,7 @@ class VDN(object):
 
     def save_model_backup(self):
         # Save the variables to disk.
-        if self.step == 51000 or self.step % 100000 == 0:
+        if self.step == 101000 or self.step % 100000 == 0:
             save_path = self.saver.save(self.sess, base_path + self.game_name +
                                         '//' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "//model.ckpt")
             print("Model saved in file: %s" % save_path)
