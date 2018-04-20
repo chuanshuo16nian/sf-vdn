@@ -353,7 +353,7 @@ class VDN(object):
             fai_input = tf.placeholder(tf.float32, shape=[None, 64])
             fai = []
             for i in range(self.Num_action):
-                fai.append(self._fai_net(network_name, fai_input))
+                fai.append(self._fai_net(network_name + str(i), fai_input))
 
             return x, autoencoder_out, reward_estimator, fai, state_feature, fai_input, st, reward_out
 
@@ -378,7 +378,7 @@ class VDN(object):
     def network(self, network_name):
         with tf.variable_scope(network_name):
             x_1, autoencoder_out_1, reward_estimator_1, fai_1, state_feature_1, fai_input_1, st1, reward_out_1 = self._dsr_net('agt1_dsrnet')
-            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2, fai_input_2, st2, reward_out_2 = self._dsr_net('agt1_dsrnet')
+            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2, fai_input_2, st2, reward_out_2 = self._dsr_net('agt2_dsrnet')
 
             return x_1, x_2, autoencoder_out_1, autoencoder_out_2, reward_estimator_1, reward_estimator_2, \
                    fai_1, fai_2, state_feature_1, state_feature_2,fai_input_1, fai_input_2, st1, st2, reward_out_1, reward_out_2
@@ -441,34 +441,45 @@ class VDN(object):
                 action_1[action_1_index] = 1
             else:
                 # choose greedy action1
-                Q_1_value = self.Q_1.eval(feed_dict={self.input_1:[stack_state_1]})
-                action_1_index = np.argmax(Q_1_value)
+                st1 = self.state_feature_1.eval(feed_dict={self.input_1:[stack_state_1]})
+                fai_1 = []
+                for i in range(self.Num_action):
+                    fai_1.append(self.fai_1[i].eval(feed_dict={self.fai_input_1:st1}))
+                q_1 = []
+                for i in range(self.Num_action):
+                    q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1:fai_1[i]}))
+                action_1_index = np.argmax(q_1)
                 action_1[action_1_index] = 1
-
             if random.random() < self.epsilon:
                 # choose random action2
                 action_2_index = random.randint(0, self.Num_action - 1)
                 action_2[action_2_index] = 1
             else:
                 # choose greedy action2
-                Q_2_value = self.Q_2.eval(feed_dict={self.input_2: [stack_state_2]})
-                action_2_index = np.argmax(Q_2_value)
+                st2 = self.state_feature_2.eval(feed_dict={self.input_2: [stack_state_2]})
+                fai_2 = []
+                for i in range(self.Num_action):
+                    fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+                q_2 = []
+                for i in range(self.Num_action):
+                    q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+                action_2_index = np.argmax(q_2)
                 action_2[action_2_index] = 1
 
             # Decrease epsilon while training
             if self.epsilon > self.final_epsilon:
                 self.epsilon -= self.first_epsilon/self.Num_Training
-        elif self.progress == 'Testing':
-            # choose greedy action
-            Q_1_value = self.Q_1.eval(feed_dict={self.input_1: [stack_state_1]})
-            action_1_index = np.argmax(Q_1_value)
-            action_1[action_1_index] = 1
-            Q_2_value = self.Q_2.eval(feed_dict={self.input_2: [stack_state_2]})
-            action_2_index = np.argmax(Q_2_value)
-            action_2[action_2_index] = 1
-            self.maxQ = np.max(Q_1_value + Q_2_value)
-
-            self.epsilon = 0
+        # elif self.progress == 'Testing':
+        #     # choose greedy action
+        #     Q_1_value = self.Q_1.eval(feed_dict={self.input_1: [stack_state_1]})
+        #     action_1_index = np.argmax(Q_1_value)
+        #     action_1[action_1_index] = 1
+        #     Q_2_value = self.Q_2.eval(feed_dict={self.input_2: [stack_state_2]})
+        #     action_2_index = np.argmax(Q_2_value)
+        #     action_2[action_2_index] = 1
+        #     self.maxQ = np.max(Q_1_value + Q_2_value)
+        #
+        #     self.epsilon = 0
 
         return action_1, action_2
 
@@ -653,8 +664,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    # agent.main()
-    agent.test()
+    agent.main()
+    # agent.test()
 
 
 
