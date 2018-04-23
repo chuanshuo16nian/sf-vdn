@@ -7,9 +7,9 @@ import datetime
 import os
 from PIL import Image
 import pylab
-from Parameters1 import Parameters
+from Parameters import Parameters
 from Fetch_3act import GameEnv
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 def to_gray(state):
@@ -20,10 +20,12 @@ WIN = False
 TEST = False
 game = 'Fetch_3act'
 USE_GPU = False
-# base_path = 'F://bs//sf-vdn//VDN_DSR//saved_models//'
-base_path = '/home/admin1/zp/VDN_DSR/saved_models/'
+if WIN:
+    base_path = 'F://bs//sf-vdn//VDN_DSR//saved_models//'
+else:
+    base_path = '/home/admin1/zp/VDN_DSR/saved_models/'
 
-class VDN(object):
+class VDN_DSR(object):
     def __init__(self):
 
         self.algorithm = 'VDN_DSR'
@@ -56,7 +58,6 @@ class VDN(object):
         self.Is_train = Parameters.Is_train
         # self.Load_path = Parameters.Load_path
 
-        self.r_saved_flag = False
         self.step = 1
         self.estep = 1
         self.score = 0
@@ -78,6 +79,7 @@ class VDN(object):
         self.Num_batch = Parameters.Num_batch
         self.replay_memory = []
         self.reward_database = []
+        self.r_saved_flag = False
         self.r_batch_size = Parameters.r_batch_size
 
         # parameters for target network
@@ -86,9 +88,9 @@ class VDN(object):
         # parameters for network
         self.input_size = Parameters.Input_size
         # self.Num_colorChannel = Parameters.Num_colorChannel
-
-        self.first_dense = Parameters.first_dense
-        self.decoder_dense = Parameters.decoder_dense
+        #
+        # self.first_dense = Parameters.first_dense
+        # self.decoder_dense = Parameters.decoder_dense
         self.reward_weight = Parameters.reward_weight
         self.fai_first_dense = Parameters.fai_first_dense
         self.fai_second_dense = Parameters.fai_second_dense
@@ -115,20 +117,20 @@ class VDN(object):
         else:
             self.sess = tf.InteractiveSession()
 
-        self.input_1,self.input_2, self.autoencoder_out_1, self.autoencoder_out_2, self.reward_estimator_1, \
-        self.reward_estimator_2, self.fai_1, self.fai_2, self.state_feature_1, self.state_feature_2, \
+        self.input_1,self.input_2, self.state_feature_1, self.state_feature_2, self.reward_estimator_1, \
+        self.reward_estimator_2, self.fai_1, self.fai_2, \
         self.fai_input_1, self.fai_input_2, self.st_for_q1, self.st_for_q2, self.q_out_1, self.q_out_2, \
         self.reward_weight_1, self.reward_weight_2= self.network('network')
 
-        self.input_target_1, self.input_target_2, self.autoencoder_out_target_1, self.autoencoder_out_target_2, \
+        self.input_target_1, self.input_target_2, self.state_feature_target_1, self.state_feature_target_2,\
         self.reward_estimator_target_1, self.reward_estimator_target_2, self.fai_target_1, self.fai_target_2, \
-        self.state_feature_target_1, self.state_feature_target_2, self.fai_input_target_1, self.fai_input_target_2, \
+        self.fai_input_target_1, self.fai_input_target_2, \
         self.st_for_q1_target, self.st_for_q2_target, self.q_out_target_1, self.q_out_target_2, \
         self.reward_weight_target_1, self.reward_weight_target2= self.network('target')
 
-        self.fai_1_target, self.fai_2_target, self.act1_target, self.act2_target,self.train_fai_1, self.train_fai_2, self.Loss_fai_1, self.Loss_fai_2, \
-        self.r_target, self.Loss_r, self.Loss_autoencoder_1, self.Loss_autoencoder_2, self.Loss_sum, \
-        self.train_r_and_autoencoder = self.loss_and_train()
+        self.fai_1_target, self.fai_2_target, self.act1_target, self.act2_target,self.train_fai_1, \
+        self.train_fai_2, self.Loss_fai_1, self.Loss_fai_2, \
+        self.r_target, self.Loss_r, self.train_r = self.loss_and_train()
 
         self.saver = self.init_saver()
         if not TEST:
@@ -260,22 +262,21 @@ class VDN(object):
 
                 self.save_model()
                 self.save_model_backup()
-
+                self.print_r_loss()
             # update former info.
             stacked_states = stacked_next_states
             self.score += r
             if len(self.reward_database) >= self.Num_rdatebase:
                 if self.r_saved_flag == False:
-                    self.score = 0
-                    self.r_saved_flag =True
                     self.save_reward()
+                    self.r_saved_flag = True
+                    self.score = 0
                     self.estep = 1
                 self.step += 1
             else:
                 self.estep += 1
             if self.estep % 10000 == 0:
                 print(len(self.reward_database), self.score)
-
             # Plotting
             self.plotting(terminal)
 
@@ -380,27 +381,29 @@ class VDN(object):
         x = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
         x_norm = (x - (255.0 / 2)) / (255.0 / 2)
         with tf.variable_scope(network_name):
-            w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
-            b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
-
-            state_feature = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
-
-            w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
-            b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
-
-            autoencoder_out = tf.matmul(state_feature, w_decoder) + b_decoder
+            # w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
+            # b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
+            state_feature = x_norm
+            # state_feature = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
+            #
+            # w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
+            # b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
+            #
+            # autoencoder_out = tf.matmul(state_feature, w_decoder) + b_decoder
 
             reward_weight = self.weight_variable(network_name + 'reward_weight', self.reward_weight)
-            st = tf.placeholder(tf.float32, shape=[None, 64])
+            st = tf.placeholder(tf.float32, shape=[None, 100])
+            # st_norm = (st - (255.0 / 2)) / (255.0 / 2)
             reward_estimator = tf.matmul(state_feature, reward_weight)
             reward_out = tf.matmul(st, reward_weight)
 
-            fai_input = tf.placeholder(tf.float32, shape=[None, 64])
+            fai_input = tf.placeholder(tf.float32, shape=[None, 100])
+            # fai_input_norm = (fai_input - (255.0 / 2)) / (255.0 / 2)
             fai = []
             for i in range(self.Num_action):
                 fai.append(self._fai_net(network_name + str(i), fai_input))
 
-            return x, autoencoder_out, reward_estimator, fai, state_feature, fai_input, st, reward_out, reward_weight
+            return x, state_feature, reward_estimator, fai, fai_input, st, reward_out, reward_weight
 
     def _fai_net(self, network_name, state_feature):
         fai_w_fc1 = self.weight_variable(network_name + 'fai_w_fc1', self.fai_first_dense)
@@ -422,27 +425,19 @@ class VDN(object):
 
     def network(self, network_name):
         with tf.variable_scope(network_name):
-            x_1, autoencoder_out_1, reward_estimator_1, fai_1, state_feature_1, fai_input_1, st1, reward_out_1, reward_weight_1 = self._dsr_net('agt1_dsrnet')
-            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2, fai_input_2, st2, reward_out_2, reward_weight_2 = self._dsr_net('agt2_dsrnet')
+            x_1,state_feature_1, reward_estimator_1, fai_1, fai_input_1, st1, reward_out_1, reward_weight_1 = self._dsr_net('agt1_dsrnet')
+            x_2,state_feature_2, reward_estimator_2, fai_2, fai_input_2, st2, reward_out_2, reward_weight_2 = self._dsr_net('agt2_dsrnet')
 
-            return x_1, x_2, autoencoder_out_1, autoencoder_out_2, reward_estimator_1, reward_estimator_2, \
-                   fai_1, fai_2, state_feature_1, state_feature_2,fai_input_1, fai_input_2, st1, st2, reward_out_1, reward_out_2, reward_weight_1, reward_weight_2
+            return x_1, x_2, state_feature_1, state_feature_2, reward_estimator_1, reward_estimator_2, \
+                   fai_1, fai_2, fai_input_1, fai_input_2, st1, st2, \
+                   reward_out_1, reward_out_2, reward_weight_1, reward_weight_2
 
     def loss_and_train(self):
         # action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
-        fai_1_target = tf.placeholder(tf.float32, shape=[None, 64])
-        fai_2_target = tf.placeholder(tf.float32, shape=[None, 64])
+        fai_1_target = tf.placeholder(tf.float32, shape=[None, 100])
+        fai_2_target = tf.placeholder(tf.float32, shape=[None, 100])
         act1_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
         act2_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
-        # for act in range(self.Num_action):
-            # fai_1_prediction = self.fai_1[act]
-            # fai_2_prediction = self.fai_2[act] # tf.reduce_sum(tf.multiply(self.output, action_target), reduction_indices=1)
-            # loss1 = tf.reduce_mean(tf.square(fai_1_prediction - fai_1_target))
-            # loss2 = tf.reduce_mean(tf.square(fai_2_prediction - fai_2_target))
-            # Loss_fai_1.append(loss1)
-            # Loss_fai_2.append(loss2)
-            # train_fai_1.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss1))
-            # train_fai_2.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss2))
         fai_1_reshape = tf.transpose(self.fai_1,[1, 0, 2])
         act2_target_reshape = tf.reshape(act1_target, [-1, self.Num_action, 1])
         fai_1_prediction = tf.reduce_sum(tf.multiply(fai_1_reshape, act2_target_reshape), reduction_indices=1)
@@ -458,14 +453,14 @@ class VDN(object):
         r_target = tf.placeholder(tf.float32, shape=[None])
         Loss_r = tf.reduce_mean(tf.square(r_target - (self.reward_estimator_1 + self.reward_estimator_2)))
 
-        Loss_autoencoder_1 = tf.reduce_mean(tf.square(self.input_1 - self.autoencoder_out_1))
-        Loss_autoencoder_2 = tf.reduce_mean(tf.square(self.input_2 - self.autoencoder_out_2))
+        # Loss_autoencoder_1 = tf.reduce_mean(tf.square(self.input_1 - self.autoencoder_out_1))
+        # Loss_autoencoder_2 = tf.reduce_mean(tf.square(self.input_2 - self.autoencoder_out_2))
 
-        Loss_sum = Loss_autoencoder_1 + Loss_autoencoder_2 + Loss_r
-        train_r_and_autoencoder = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_sum)
+        # Loss_sum = Loss_autoencoder_1 + Loss_autoencoder_2 + Loss_r
+        train_r = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_r)
 
         return fai_1_target, fai_2_target, act1_target, act2_target, train_fai_1, train_fai_2, Loss_fai_1, Loss_fai_2, \
-                r_target, Loss_r, Loss_autoencoder_1, Loss_autoencoder_2, Loss_sum, train_r_and_autoencoder
+                r_target, Loss_r, train_r
 
     def select_action(self, stack_state_1, stack_state_2):
         action_1 = np.zeros([self.Num_action])
@@ -566,10 +561,10 @@ class VDN(object):
         next_state_1_batch = [batch[3][0] for batch in minibatch]
         next_state_2_batch = [batch[3][1] for batch in minibatch]
         reward_batch = [batch[2] for batch in minibatch]
-        _, self.r_branch_loss = self.sess.run([self.train_r_and_autoencoder, self.Loss_sum], feed_dict={self.input_1:next_state_1_batch,
-                                                                                                        self.input_2:next_state_2_batch,
-                                                                                                        self.r_target: reward_batch})
-
+        _, r_branch_loss = self.sess.run([self.train_r, self.Loss_r], feed_dict={self.input_1:next_state_1_batch,
+                                                                                      self.input_2:next_state_2_batch,
+                                                                                      self.r_target: reward_batch})
+        self.r_branch_loss += r_branch_loss
         # Train fai branch
         minibatch = random.sample(replay_memory, self.Num_batch)
 
@@ -591,12 +586,6 @@ class VDN(object):
         next_state_1_batch = [batch[3][0] for batch in minibatch]
         next_state_2_batch = [batch[3][1] for batch in minibatch]
         terminal_batch = [batch[4] for batch in minibatch]
-        # action_batch = []
-        # for i in range(len(minibatch)):
-        #     tmp = np.zeros([self.Num_action * self.Num_action])
-        #     index = action_1_batch[i] * self.Num_action + action_2_batch[i]
-        #     tmp[index] = 1
-        #     action_batch.append(tmp)
         # get y_prediction
         y1_batch = []
         y2_batch = []
@@ -651,15 +640,23 @@ class VDN(object):
     def save_model(self):
         # Save the variables to disk.
         if self.step == self.Num_Exploration + self.Num_Training:
-            save_path = self.saver.save(self.sess, base_path + self.game_name +
-                                        '//' + self.date_time +  '_' + self.algorithm + "//model.ckpt")
+            if WIN:
+                save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                            '//' + self.date_time +  '_' + self.algorithm + "//model.ckpt")
+            else:
+                save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                            '/' + self.date_time + '_' + self.algorithm + "/model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def save_model_backup(self):
         # Save the variables to disk.
         if self.step == 101000 or self.step % 100000 == 0:
-            save_path = self.saver.save(self.sess, base_path + self.game_name +
-                                        '//' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "//model.ckpt")
+            if WIN:
+                save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                            '//' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "//model.ckpt")
+            else:
+                save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                            '/' + self.date_time + '_' + self.algorithm + '_' + str(self.step) + "/model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def plotting(self, terminal):
@@ -703,6 +700,11 @@ class VDN(object):
 
         return stacked_state
 
+    def print_r_loss(self):
+        if self.step % 50000 == 0:
+            print('mean loss of r: %f' % (self.r_branch_loss/50000))
+        self.r_branch_loss = 0
+
     def save_reward(self):
         if WIN:
             dirpath = base_path + self.game_name +'//' + self.date_time + '_' + self.algorithm + '_r'
@@ -715,8 +717,27 @@ class VDN(object):
         file = pd.DataFrame(columns=name, data=self.reward_database)
         file.to_csv(path)
 
+    def read_reward(self):
+        if WIN:
+            path = base_path + self.game_name +'//' + self.date_time + '_' + self.algorithm + "//rd.csv"
+        else:
+            path = base_path + self.game_name +'/' + self.date_time + '_' + self.algorithm + "/rd.csv"
+        try:
+            file = open(path, 'r', encoding="utf-8")
+            context = file.read()
+            list_result = context.split("\n")
+            length = len(list_result)
+            for i in range(length):
+                list_result[i] = list_result[i].split(",")
+            return list_result
+        except Exception:
+            print('Failed to read rd!')
+        finally:
+            file.close()
+
+
 if __name__ == '__main__':
-    agent = VDN()
+    agent = VDN_DSR()
     agent.main()
     # agent.test()
 

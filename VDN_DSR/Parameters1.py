@@ -26,10 +26,10 @@ class Parameters(object):
     Input_size = 25 * Num_stackFrame
     # img_size = 80
     #
-    # first_dense = [Input_size, 64]
-    # decoder_dense = [64, Input_size]
-    reward_weight = [100, 1]
+    first_dense = [Input_size, 64]
+    decoder_dense = [64, Input_size]
+    reward_weight = [64, 1]
 
-    fai_first_dense = [100, 64]
+    fai_first_dense = [64, 64]
     fai_second_dense = [64, 64]
-    fai_out_dense = [64,100]
+    fai_out_dense = [64,64]
