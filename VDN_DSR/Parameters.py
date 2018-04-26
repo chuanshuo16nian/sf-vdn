@@ -15,8 +15,8 @@ class Parameters(object):
     Num_stackFrame = 4
     # Num_colorChannel =1
     Num_plot_episode = 10
-    Num_rdatabase = 4000
-    r_batch_size = 4000
+    Num_rdatabase = 1000
+    r_batch_size = 1000
 
 
     GPU_fraction = 0.2
@@ -25,11 +25,11 @@ class Parameters(object):
 
     Input_size = 25 * Num_stackFrame
     # img_size = 80
+    #
+    # first_dense = [Input_size, 64]
+    # decoder_dense = [64, Input_size]
+    reward_weight = [100, 1]
 
-    first_dense = [Input_size, 64]
-    decoder_dense = [64, Input_size]
-    reward_weight = [64, 1]
-
-    fai_first_dense = [64, 64]
-    fai_second_dense = [64, 32]
-    fai_out_dense = [32,64]
+    fai_first_dense = [100, 64]
+    fai_second_dense = [64, 64]
+    fai_out_dense = [64,100]

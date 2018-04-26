@@ -2,25 +2,28 @@ import tensorflow as tf
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import datetime
 import os
 from PIL import Image
 import pylab
-from Parameters import Parameters
+from Parameters1 import Parameters
 from Fetch_3act import GameEnv
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
 
 def to_gray(state):
     im = Image.fromarray(np.uint8(state * 255))
     im = im.convert('L')
     return pylab.array(im)
-
-
+WIN = False
+TEST = False
 game = 'Fetch_3act'
 USE_GPU = False
-base_path = 'F://bs//sf-vdn//VDN_DSR//saved_models//'
+# base_path = 'F://bs//sf-vdn//VDN_DSR//saved_models//'
+base_path = '/home/admin1/zp/VDN_DSR/saved_models/'
 
-class VDN(object):
+class VDN_DSR(object):
     def __init__(self):
 
         self.algorithm = 'VDN_DSR'
@@ -53,7 +56,9 @@ class VDN(object):
         self.Is_train = Parameters.Is_train
         # self.Load_path = Parameters.Load_path
 
+        self.r_saved_flag = False
         self.step = 1
+        self.estep = 1
         self.score = 0
         self.episode = 0
 
@@ -112,37 +117,44 @@ class VDN(object):
 
         self.input_1,self.input_2, self.autoencoder_out_1, self.autoencoder_out_2, self.reward_estimator_1, \
         self.reward_estimator_2, self.fai_1, self.fai_2, self.state_feature_1, self.state_feature_2, \
-        self.fai_input_1, self.fai_input_2, self.st_for_q1, self.st_for_q2, self.q_out_1, self.q_out_2= self.network('network')
+        self.fai_input_1, self.fai_input_2, self.st_for_q1, self.st_for_q2, self.q_out_1, self.q_out_2, \
+        self.reward_weight_1, self.reward_weight_2= self.network('network')
 
         self.input_target_1, self.input_target_2, self.autoencoder_out_target_1, self.autoencoder_out_target_2, \
         self.reward_estimator_target_1, self.reward_estimator_target_2, self.fai_target_1, self.fai_target_2, \
         self.state_feature_target_1, self.state_feature_target_2, self.fai_input_target_1, self.fai_input_target_2, \
-        self.st_for_q1_target, self.st_for_q2_target, self.q_out_target_1, self.q_out_target_2 = self.network('target')
+        self.st_for_q1_target, self.st_for_q2_target, self.q_out_target_1, self.q_out_target_2, \
+        self.reward_weight_target_1, self.reward_weight_target2= self.network('target')
 
         self.fai_1_target, self.fai_2_target, self.act1_target, self.act2_target,self.train_fai_1, self.train_fai_2, self.Loss_fai_1, self.Loss_fai_2, \
         self.r_target, self.Loss_r, self.Loss_autoencoder_1, self.Loss_autoencoder_2, self.Loss_sum, \
         self.train_r_and_autoencoder = self.loss_and_train()
 
-        self.saver, self.summary_placeholders, \
-        self.update_ops, self.summary_op, self.summary_writer = self.init()
+        self.saver = self.init_saver()
+        if not TEST:
+            self.summary_placeholders, \
+            self.update_ops, self.summary_op, self.summary_writer = self.init()
 
         self.sess.run(tf.global_variables_initializer())
         # check save
-        check_save = input('Load Model?(1=yes/2=no):')
-        if check_save == '1':
-            # restore variable from disk
-            load_path = input('Please input the model path:')
-            self.saver.restore(self.sess, load_path)
-            print("Model restored")
+        if not TEST:
+            check_save = input('Load Model?(1=yes/2=no):')
+            if check_save == '1':
+                # restore variable from disk
+                load_path = input('Please input the model path:')
+                self.saver.restore(self.sess, load_path)
+                print("Model restored")
 
-            check_train = input("Prediction or training?(1=Inference/2=Training):")
-            if check_train == '1':
-                self.Num_Exploration = 0
-                self.Num_Training = 0
+                check_train = input("Prediction or training?(1=Inference/2=Training):")
+                if check_train == '1':
+                    self.Num_Exploration = 0
+                    self.Num_Training = 0
 
     def test(self):
         load_path = input("Please input the model path:")
         self.saver.restore(self.sess, load_path)
+        print(self.sess.run(self.reward_weight_1))
+        print(self.sess.run(self.reward_weight_2))
         states = self.initialization()
         stacked_states = self.skip_and_stack_frame(states)
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
@@ -169,6 +181,8 @@ class VDN(object):
                 for i in range(self.Num_action):
                     q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
                 act2 = np.argmax(q_2)
+            # act1 = int(input('act1:'))
+            # act2 = int(input('act2:'))
             r1, r2 = self.env.move(act1, act2)
             self.step += 1
             agent1_state_pre, agent2_state_pre = self.env.get_states()
@@ -181,7 +195,13 @@ class VDN(object):
             stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
             stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
             print("act1: %d, act2: %d" % (act1, act2))
-            print("r1: %d, r2: %d" % (r1, r2))
+            print("True:r1: %d, r2: %d" % (r1, r2))
+            st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
+            st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            pr1 = self.q_out_1.eval(feed_dict={self.st_for_q1: st1})
+            pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
+            print(st1)
+            print("Predicted:r1: %f, r2: %f" % (pr1, pr2))
             im = self.env.render_env()
             plt.imshow(im)
             plt.show(block=False)
@@ -244,7 +264,17 @@ class VDN(object):
             # update former info.
             stacked_states = stacked_next_states
             self.score += r
-            self.step += 1
+            if len(self.reward_database) >= self.Num_rdatebase:
+                if self.r_saved_flag == False:
+                    self.score = 0
+                    self.r_saved_flag =True
+                    self.save_reward()
+                    self.estep = 1
+                self.step += 1
+            else:
+                self.estep += 1
+            if self.estep % 10000 == 0:
+                print(len(self.reward_database), self.score)
 
             # Plotting
             self.plotting(terminal)
@@ -265,19 +295,22 @@ class VDN(object):
                 print('Finished!')
                 break
 
+    def init_saver(self):
+        saver = tf.train.Saver()
+        return saver
+
     def init(self):
 
-
         # make folder to save model
-        save_path = '/saved_models/'+ self.game_name + '/' + self.date_time
+        save_path = './saved_models/'+ self.game_name + '/' + self.date_time
+
         os.makedirs(save_path)
 
         # Summary for tensorboard
         summary_placeholdes, update_ops, summary_op = self.setup_summary()
         summary_writer = tf.summary.FileWriter(save_path, self.sess.graph)
 
-        saver = tf.train.Saver()
-        return saver, summary_placeholdes, update_ops, summary_op, summary_writer
+        return summary_placeholdes, update_ops, summary_op, summary_writer
 
     def initialization(self):
         self.env.reset()
@@ -367,7 +400,7 @@ class VDN(object):
             for i in range(self.Num_action):
                 fai.append(self._fai_net(network_name + str(i), fai_input))
 
-            return x, autoencoder_out, reward_estimator, fai, state_feature, fai_input, st, reward_out
+            return x, autoencoder_out, reward_estimator, fai, state_feature, fai_input, st, reward_out, reward_weight
 
     def _fai_net(self, network_name, state_feature):
         fai_w_fc1 = self.weight_variable(network_name + 'fai_w_fc1', self.fai_first_dense)
@@ -389,11 +422,11 @@ class VDN(object):
 
     def network(self, network_name):
         with tf.variable_scope(network_name):
-            x_1, autoencoder_out_1, reward_estimator_1, fai_1, state_feature_1, fai_input_1, st1, reward_out_1 = self._dsr_net('agt1_dsrnet')
-            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2, fai_input_2, st2, reward_out_2 = self._dsr_net('agt2_dsrnet')
+            x_1, autoencoder_out_1, reward_estimator_1, fai_1, state_feature_1, fai_input_1, st1, reward_out_1, reward_weight_1 = self._dsr_net('agt1_dsrnet')
+            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2, fai_input_2, st2, reward_out_2, reward_weight_2 = self._dsr_net('agt2_dsrnet')
 
             return x_1, x_2, autoencoder_out_1, autoencoder_out_2, reward_estimator_1, reward_estimator_2, \
-                   fai_1, fai_2, state_feature_1, state_feature_2,fai_input_1, fai_input_2, st1, st2, reward_out_1, reward_out_2
+                   fai_1, fai_2, state_feature_1, state_feature_2,fai_input_1, fai_input_2, st1, st2, reward_out_1, reward_out_2, reward_weight_1, reward_weight_2
 
     def loss_and_train(self):
         # action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
@@ -411,13 +444,13 @@ class VDN(object):
             # train_fai_1.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss1))
             # train_fai_2.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss2))
         fai_1_reshape = tf.transpose(self.fai_1,[1, 0, 2])
-        act2_target_reshape = tf.reshape(act1_target, [-1, 3, 1])
+        act2_target_reshape = tf.reshape(act1_target, [-1, self.Num_action, 1])
         fai_1_prediction = tf.reduce_sum(tf.multiply(fai_1_reshape, act2_target_reshape), reduction_indices=1)
         Loss_fai_1 = tf.reduce_mean(tf.square(fai_1_prediction - fai_1_target))
         train_fai_1 = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_fai_1)
 
         fai_2_reshape = tf.transpose(self.fai_2, [1, 0, 2])
-        act2_target_reshape = tf.reshape(act2_target, [-1, 3, 1])
+        act2_target_reshape = tf.reshape(act2_target, [-1, self.Num_action, 1])
         fai_2_prediction = tf.reduce_sum(tf.multiply(fai_2_reshape, act2_target_reshape))
         Loss_fai_2 = tf.reduce_mean(tf.square(fai_2_prediction - fai_2_target))
         train_fai_2 = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_fai_2)
@@ -503,7 +536,7 @@ class VDN(object):
         if reward != 0:
             if len(self.reward_database) >= self.Num_rdatebase:
                 del self.replay_memory[0]
-            self.reward_database.append([[state, action, reward, next_state, terminal]])
+            self.reward_database.append([state, action, reward, next_state, terminal])
 
     def update_target(self):
         # Get trainable variables
@@ -520,16 +553,13 @@ class VDN(object):
     def train(self, replay_memory):
 
         # Train r branch
-        if random.random() <= 0.8:
+        if random.random() <= 0.5:
             minibatch = random.sample(replay_memory, self.r_batch_size)
         else:
-            if len(self.reward_database) >= self.Num_rdatebase:
-                minibatch = random.sample(self.reward_database, self.r_batch_size)
-            else:
-                minibatch = random.sample(replay_memory, self.r_batch_size)
-        # Aneal rbatch size by factot 0.5
+            minibatch = random.sample(self.reward_database, self.r_batch_size)
+        # Aneal rbatch size by factot 0.8
         if self.r_batch_size > 1:
-            self.r_batch_size = int(self.r_batch_size * 0.5)
+            self.r_batch_size = int(self.r_batch_size * 0.8)
         if self.r_batch_size < 1:
             self.r_batch_size = 1
 
@@ -673,11 +703,25 @@ class VDN(object):
 
         return stacked_state
 
+    def save_reward(self):
+        if WIN:
+            dirpath = base_path + self.game_name +'//' + self.date_time + '_' + self.algorithm + '_r'
+            path = base_path + self.game_name +'//' + self.date_time + '_' + self.algorithm + '_r' + "//rd.csv"
+        else:
+            dirpath = base_path + self.game_name +'/' + self.date_time + '_' + self.algorithm + '_r'
+            path = base_path + self.game_name +'/' + self.date_time + '_' + self.algorithm + '_r' + "/rd.csv"
+        os.makedirs(dirpath)
+        name  = ['s','a','r','ns','terminal']
+        file = pd.DataFrame(columns=name, data=self.reward_database)
+        file.to_csv(path)
 
 if __name__ == '__main__':
-    agent = VDN()
-    # agent.main()
-    agent.test()
+    agent = VDN_DSR()
+    if TEST:
+        agent.test()
+    else:
+        agent.main()
+
 
 
 
