@@ -148,7 +148,7 @@ class VDN(object):
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.0:
+            if random.random() < 0.2:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
@@ -676,8 +676,8 @@ class VDN(object):
 
 if __name__ == '__main__':
     agent = VDN()
-    agent.main()
-    # agent.test()
+    # agent.main()
+    agent.test()
 
 
 
