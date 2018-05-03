@@ -777,8 +777,8 @@ class VDN_DSR(object):
 
 if __name__ == '__main__':
     agent = VDN_DSR()
-    agent.main()
-    # agent.test()
+    # agent.main()
+    agent.test()
 
 
 

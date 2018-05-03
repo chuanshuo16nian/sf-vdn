@@ -1,0 +1,3 @@
+model_checkpoint_path: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one/2018-05-03 16_30_VDN_DSR_101000/model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one/2018-05-03 16_30_VDN_DSR_100000/model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one/2018-05-03 16_30_VDN_DSR_101000/model.ckpt"

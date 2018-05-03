@@ -624,8 +624,8 @@ class VDN_DSR(object):
             q1_batch.append(self.q_out_1.eval(feed_dict={self.st_for_q1:fai_1_batch[i]}))
             q2_batch.append(self.q_out_2.eval(feed_dict={self.st_for_q2:fai_2_batch[i]}))
         for i in range(len(minibatch)):
-            tmp1 =[]
-            tmp2 =[]
+            tmp1 = []
+            tmp2 = []
             for j in range(self.Num_action):
                 tmp1.append(q1_batch[j][i])
                 tmp2.append(q2_batch[j][i])
