@@ -17,7 +17,7 @@ def to_gray(state):
     im = im.convert('L')
     return pylab.array(im)
 WIN = False
-TEST = False
+TEST = True
 game = 'Fetch_3act_one'
 USE_GPU = False
 if WIN:
@@ -154,13 +154,13 @@ class VDN_DSR(object):
         load_path = input("Please input the model path:")
         self.saver.restore(self.sess, load_path)
         print(self.sess.run(self.reward_weight_1))
-        print(self.sess.run(self.reward_weight_2))
+        # print(self.sess.run(self.reward_weight_2))
         states = self.initialization()
         stacked_states = self.skip_and_stack_frame(states)
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.2:
+            if random.random() < 0.0:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
@@ -173,14 +173,14 @@ class VDN_DSR(object):
                 for i in range(self.Num_action):
                     q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1: fai_1[i]}))
                 act1 = np.argmax(q_1)
-                st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
-                fai_2 = []
-                for i in range(self.Num_action):
-                    fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
-                q_2 = []
-                for i in range(self.Num_action):
-                    q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
-                act2 = np.argmax(q_2)
+                # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+                # fai_2 = []
+                # for i in range(self.Num_action):
+                #     fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+                # q_2 = []
+                # for i in range(self.Num_action):
+                #     q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+                act2 = 2
             # act1 = int(input('act1:'))
             # act2 = int(input('act2:'))
             r1, r2 = self.env.move(act1, act2)
@@ -197,11 +197,11 @@ class VDN_DSR(object):
             print("act1: %d, act2: %d" % (act1, act2))
             print("True:r1: %d, r2: %d" % (r1, r2))
             st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
-            st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
             pr1 = self.q_out_1.eval(feed_dict={self.st_for_q1: st1})
-            pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
+            # pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
             print(st1)
-            print("Predicted:r1: %f, r2: %f" % (pr1, pr2))
+            # print("Predicted:r1: %f, r2: %f" % (pr1, pr2))
             im = self.env.render_env()
             plt.imshow(im)
             plt.show(block=False)
@@ -807,7 +807,7 @@ class VDN_DSR(object):
 if __name__ == '__main__':
     agent = VDN_DSR()
     if TEST:
-        agent.test_r()
+        agent.test()
     else:
         agent.main()
 
