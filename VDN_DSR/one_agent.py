@@ -223,6 +223,79 @@ class VDN_DSR(object):
                 stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
                 self.episode += 1
 
+    def test_r(self):
+        load_path = input("Please input the model path:")
+        self.saver.restore(self.sess, load_path)
+        print(self.sess.run(self.reward_weight_1))
+        # print(self.sess.run(self.reward_weight_2))
+        states = self.initialization()
+        stacked_states = self.skip_and_stack_frame(states)
+        stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+        stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+        while self.step < self.Num_Testing:
+            # if random.random() < 0.2:
+            #     act1 = random.randint(0, self.Num_action - 1)
+            #     act2 = random.randint(0, self.Num_action - 1)
+            # else:
+            #     # choose greedy action1
+            #     st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
+            #     fai_1 = []
+            #     for i in range(self.Num_action):
+            #         fai_1.append(self.fai_1[i].eval(feed_dict={self.fai_input_1: st1}))
+            #     q_1 = []
+            #     for i in range(self.Num_action):
+            #         q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1: fai_1[i]}))
+            #     act1 = np.argmax(q_1)
+            #     # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            #     # fai_2 = []
+            #     # for i in range(self.Num_action):
+            #     #     fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+            #     # q_2 = []
+            #     # for i in range(self.Num_action):
+            #         # q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+            #     act2 = 2
+            act1 = int(input('act1:'))
+            act2 = 2
+            r1, r2 = self.env.move(act1, act2)
+            self.step += 1
+            agent1_state_pre, agent2_state_pre = self.env.get_states()
+            agent1_state = to_gray(agent1_state_pre)
+            agent2_state = to_gray(agent2_state_pre)
+            agent1_state_reshape = self.reshape_input(agent1_state)
+            agent2_state_reshape = self.reshape_input(agent2_state)
+            states = [agent1_state_reshape, agent2_state_reshape]
+            stacked_states = self.skip_and_stack_frame(states)
+            stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+            stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+            print("act1: %d, act2: %d" % (act1, act2))
+            print("True:r1: %d, r2: %d" % (r1, r2))
+            st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
+            # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            pr1 = self.q_out_1.eval(feed_dict={self.st_for_q1: st1})
+            # pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
+            print(st1)
+            print("Predicted:r1: %f" % pr1)
+            im = self.env.render_env()
+            plt.imshow(im)
+            plt.show(block=False)
+            plt.pause(0.02)
+            plt.clf()
+            terminal = False
+            if r1 == 5 or r2 == 5:
+                terminal = False
+            if terminal:
+                print('Step: ' + str(self.step) + ' / ' +
+                      'Episode: ' + str(self.episode) + ' / ' +
+                      'Progress: ' + self.progress + ' / ' +
+                      'Epsilon: ' + str(self.epsilon) + ' / ' +
+                      'Score: ' + str(self.score))
+                # If game is finished, initialize the state
+                states = self.initialization()
+                stacked_states = self.skip_and_stack_frame(states)
+                stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+                stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+                self.episode += 1
+
     def main(self):
         states = self.initialization()
         stacked_states = self.skip_and_stack_frame(states)
@@ -546,7 +619,7 @@ class VDN_DSR(object):
     def train(self, replay_memory):
 
         # Train r branch
-        if random.random() <= 0.6:
+        if random.random() <= 0.8:
             minibatch = random.sample(replay_memory, self.r_batch_size)
         else:
             minibatch = random.sample(self.reward_database, self.r_batch_size)
@@ -734,7 +807,7 @@ class VDN_DSR(object):
 if __name__ == '__main__':
     agent = VDN_DSR()
     if TEST:
-        agent.test()
+        agent.test_r()
     else:
         agent.main()
 
