@@ -7,9 +7,9 @@ import datetime
 import os
 from PIL import Image
 import pylab
-from Parameters import Parameters
+from Parameters1 import Parameters
 from Fetch_3act import GameEnv
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
 def to_gray(state):
@@ -17,7 +17,7 @@ def to_gray(state):
     im = im.convert('L')
     return pylab.array(im)
 WIN = False
-TEST = True
+TEST = False
 game = 'Fetch_3act_one'
 USE_GPU = False
 if WIN:
@@ -58,6 +58,7 @@ class VDN_DSR(object):
         self.Is_train = Parameters.Is_train
         # self.Load_path = Parameters.Load_path
 
+        self.r_saved_flag = False
         self.step = 1
         self.estep = 1
         self.score = 0
@@ -79,7 +80,6 @@ class VDN_DSR(object):
         self.Num_batch = Parameters.Num_batch
         self.replay_memory = []
         self.reward_database = []
-        self.r_saved_flag = False
         self.r_batch_size = Parameters.r_batch_size
 
         # parameters for target network
@@ -88,9 +88,9 @@ class VDN_DSR(object):
         # parameters for network
         self.input_size = Parameters.Input_size
         # self.Num_colorChannel = Parameters.Num_colorChannel
-        #
-        # self.first_dense = Parameters.first_dense
-        # self.decoder_dense = Parameters.decoder_dense
+
+        self.first_dense = Parameters.first_dense
+        self.decoder_dense = Parameters.decoder_dense
         self.reward_weight = Parameters.reward_weight
         self.fai_first_dense = Parameters.fai_first_dense
         self.fai_second_dense = Parameters.fai_second_dense
@@ -117,18 +117,20 @@ class VDN_DSR(object):
         else:
             self.sess = tf.InteractiveSession()
 
-        self.input_1, self.state_feature_1, self.reward_estimator_1, self.fai_1, \
-        self.fai_input_1, self.st_for_q1, self.q_out_1, \
-        self.reward_weight_1= self.network('network')
+        self.input_1,self.input_2, self.autoencoder_out_1, self.autoencoder_out_2, self.reward_estimator_1, \
+        self.reward_estimator_2, self.fai_1, self.fai_2, self.state_feature_1, self.state_feature_2, \
+        self.fai_input_1, self.fai_input_2, self.st_for_q1, self.st_for_q2, self.q_out_1, self.q_out_2, \
+        self.reward_weight_1, self.reward_weight_2= self.network('network')
 
-        self.input_target_1, self.state_feature_target_1,\
-        self.reward_estimator_target_1, self.fai_target_1, \
-        self.fai_input_target_1, \
-        self.st_for_q1_target, self.q_out_target_1, \
-        self.reward_weight_target_1= self.network('target')
+        self.input_target_1, self.input_target_2, self.autoencoder_out_target_1, self.autoencoder_out_target_2, \
+        self.reward_estimator_target_1, self.reward_estimator_target_2, self.fai_target_1, self.fai_target_2, \
+        self.state_feature_target_1, self.state_feature_target_2, self.fai_input_target_1, self.fai_input_target_2, \
+        self.st_for_q1_target, self.st_for_q2_target, self.q_out_target_1, self.q_out_target_2, \
+        self.reward_weight_target_1, self.reward_weight_target2= self.network('target')
 
-        self.fai_1_target, self.act1_target,self.train_fai_1, self.Loss_fai_1, \
-        self.r_target, self.Loss_r, self.train_r = self.loss_and_train()
+        self.fai_1_target, self.fai_2_target, self.act1_target, self.act2_target,self.train_fai_1, self.train_fai_2, self.Loss_fai_1, self.Loss_fai_2, \
+        self.r_target, self.Loss_r, self.Loss_autoencoder_1, self.Loss_autoencoder_2, self.Loss_sum, \
+        self.train_r_and_autoencoder = self.loss_and_train()
 
         self.saver = self.init_saver()
         if not TEST:
@@ -154,13 +156,13 @@ class VDN_DSR(object):
         load_path = input("Please input the model path:")
         self.saver.restore(self.sess, load_path)
         print(self.sess.run(self.reward_weight_1))
-        # print(self.sess.run(self.reward_weight_2))
+        print(self.sess.run(self.reward_weight_2))
         states = self.initialization()
         stacked_states = self.skip_and_stack_frame(states)
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.0:
+            if random.random() < 0.2:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = random.randint(0, self.Num_action - 1)
             else:
@@ -173,14 +175,14 @@ class VDN_DSR(object):
                 for i in range(self.Num_action):
                     q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1: fai_1[i]}))
                 act1 = np.argmax(q_1)
-                # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
-                # fai_2 = []
-                # for i in range(self.Num_action):
-                #     fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
-                # q_2 = []
-                # for i in range(self.Num_action):
-                #     q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
-                act2 = 2
+                st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+                fai_2 = []
+                for i in range(self.Num_action):
+                    fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+                q_2 = []
+                for i in range(self.Num_action):
+                    q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+                act2 = np.argmax(q_2)
             # act1 = int(input('act1:'))
             # act2 = int(input('act2:'))
             r1, r2 = self.env.move(act1, act2)
@@ -197,84 +199,11 @@ class VDN_DSR(object):
             print("act1: %d, act2: %d" % (act1, act2))
             print("True:r1: %d, r2: %d" % (r1, r2))
             st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
-            # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
             pr1 = self.q_out_1.eval(feed_dict={self.st_for_q1: st1})
-            # pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
+            pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
             print(st1)
-            # print("Predicted:r1: %f, r2: %f" % (pr1, pr2))
-            im = self.env.render_env()
-            plt.imshow(im)
-            plt.show(block=False)
-            plt.pause(0.02)
-            plt.clf()
-            terminal = False
-            if r1 == 5 or r2 == 5:
-                terminal = False
-            if terminal:
-                print('Step: ' + str(self.step) + ' / ' +
-                      'Episode: ' + str(self.episode) + ' / ' +
-                      'Progress: ' + self.progress + ' / ' +
-                      'Epsilon: ' + str(self.epsilon) + ' / ' +
-                      'Score: ' + str(self.score))
-                # If game is finished, initialize the state
-                states = self.initialization()
-                stacked_states = self.skip_and_stack_frame(states)
-                stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
-                stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
-                self.episode += 1
-
-    def test_r(self):
-        load_path = input("Please input the model path:")
-        self.saver.restore(self.sess, load_path)
-        print(self.sess.run(self.reward_weight_1))
-        # print(self.sess.run(self.reward_weight_2))
-        states = self.initialization()
-        stacked_states = self.skip_and_stack_frame(states)
-        stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
-        stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
-        while self.step < self.Num_Testing:
-            # if random.random() < 0.2:
-            #     act1 = random.randint(0, self.Num_action - 1)
-            #     act2 = random.randint(0, self.Num_action - 1)
-            # else:
-            #     # choose greedy action1
-            #     st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
-            #     fai_1 = []
-            #     for i in range(self.Num_action):
-            #         fai_1.append(self.fai_1[i].eval(feed_dict={self.fai_input_1: st1}))
-            #     q_1 = []
-            #     for i in range(self.Num_action):
-            #         q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1: fai_1[i]}))
-            #     act1 = np.argmax(q_1)
-            #     # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
-            #     # fai_2 = []
-            #     # for i in range(self.Num_action):
-            #     #     fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
-            #     # q_2 = []
-            #     # for i in range(self.Num_action):
-            #         # q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
-            #     act2 = 2
-            act1 = int(input('act1:'))
-            act2 = 2
-            r1, r2 = self.env.move(act1, act2)
-            self.step += 1
-            agent1_state_pre, agent2_state_pre = self.env.get_states()
-            agent1_state = to_gray(agent1_state_pre)
-            agent2_state = to_gray(agent2_state_pre)
-            agent1_state_reshape = self.reshape_input(agent1_state)
-            agent2_state_reshape = self.reshape_input(agent2_state)
-            states = [agent1_state_reshape, agent2_state_reshape]
-            stacked_states = self.skip_and_stack_frame(states)
-            stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
-            stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
-            print("act1: %d, act2: %d" % (act1, act2))
-            print("True:r1: %d, r2: %d" % (r1, r2))
-            st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
-            # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
-            pr1 = self.q_out_1.eval(feed_dict={self.st_for_q1: st1})
-            # pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
-            print(st1)
-            print("Predicted:r1: %f" % pr1)
+            print("Predicted:r1: %f, r2: %f" % (pr1, pr2))
             im = self.env.render_env()
             plt.imshow(im)
             plt.show(block=False)
@@ -304,9 +233,9 @@ class VDN_DSR(object):
             self.progress = self.get_progress()
 
             # select action
-            act1_one_shot = self.select_action(stacked_states[0], stacked_states[1])
+            act1_one_shot, act2_one_shot = self.select_action(stacked_states[0], stacked_states[1])
             act1 = np.argmax(act1_one_shot)
-            act2 = 2
+            act2 = np.argmax(act2_one_shot)
             # Take actions and get info for update
             r1, r2 = self.env.move(act1, act2)
             r = r1 + r2
@@ -333,21 +262,22 @@ class VDN_DSR(object):
 
                 self.save_model()
                 self.save_model_backup()
-                self.print_r_loss()
+
             # update former info.
             stacked_states = stacked_next_states
             self.score += r
             if len(self.reward_database) >= self.Num_rdatebase:
                 if self.r_saved_flag == False:
-                    # self.save_reward()
-                    self.r_saved_flag = True
                     self.score = 0
+                    self.r_saved_flag =True
+                    # self.save_reward()
                     self.estep = 1
                 self.step += 1
             else:
                 self.estep += 1
             if self.estep % 10000 == 0:
                 print(len(self.reward_database), self.score)
+
             # Plotting
             self.plotting(terminal)
 
@@ -452,29 +382,27 @@ class VDN_DSR(object):
         x = tf.placeholder(tf.float32, shape=[None, 25 * self.Num_stacking])
         x_norm = (x - (255.0 / 2)) / (255.0 / 2)
         with tf.variable_scope(network_name):
-            # w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
-            # b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
-            state_feature = x_norm
-            # state_feature = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
-            #
-            # w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
-            # b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
-            #
-            # autoencoder_out = tf.matmul(state_feature, w_decoder) + b_decoder
+            w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
+            b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
+
+            state_feature = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
+
+            w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
+            b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
+
+            autoencoder_out = tf.matmul(state_feature, w_decoder) + b_decoder
 
             reward_weight = self.weight_variable(network_name + 'reward_weight', self.reward_weight)
-            st = tf.placeholder(tf.float32, shape=[None, 100])
-            # st_norm = (st - (255.0 / 2)) / (255.0 / 2)
+            st = tf.placeholder(tf.float32, shape=[None, 64])
             reward_estimator = tf.matmul(state_feature, reward_weight)
             reward_out = tf.matmul(st, reward_weight)
 
-            fai_input = tf.placeholder(tf.float32, shape=[None, 100])
-            # fai_input_norm = (fai_input - (255.0 / 2)) / (255.0 / 2)
+            fai_input = tf.placeholder(tf.float32, shape=[None, 64])
             fai = []
             for i in range(self.Num_action):
                 fai.append(self._fai_net(network_name + str(i), fai_input))
 
-            return x, state_feature, reward_estimator, fai, fai_input, st, reward_out, reward_weight
+            return x, autoencoder_out, reward_estimator, fai, state_feature, fai_input, st, reward_out, reward_weight
 
     def _fai_net(self, network_name, state_feature):
         fai_w_fc1 = self.weight_variable(network_name + 'fai_w_fc1', self.fai_first_dense)
@@ -496,55 +424,63 @@ class VDN_DSR(object):
 
     def network(self, network_name):
         with tf.variable_scope(network_name):
-            x_1,state_feature_1, reward_estimator_1, fai_1, fai_input_1, st1, reward_out_1, reward_weight_1 = self._dsr_net('agt1_dsrnet')
-            # x_2,state_feature_2, reward_estimator_2, fai_2, fai_input_2, st2, reward_out_2, reward_weight_2 = self._dsr_net('agt2_dsrnet')
+            x_1, autoencoder_out_1, reward_estimator_1, fai_1, state_feature_1, fai_input_1, st1, reward_out_1, reward_weight_1 = self._dsr_net('agt1_dsrnet')
+            x_2, autoencoder_out_2, reward_estimator_2, fai_2, state_feature_2, fai_input_2, st2, reward_out_2, reward_weight_2 = self._dsr_net('agt2_dsrnet')
 
-            return x_1, state_feature_1, reward_estimator_1, \
-                   fai_1, fai_input_1, st1, \
-                   reward_out_1, reward_weight_1
+            return x_1, x_2, autoencoder_out_1, autoencoder_out_2, reward_estimator_1, reward_estimator_2, \
+                   fai_1, fai_2, state_feature_1, state_feature_2,fai_input_1, fai_input_2, st1, st2, reward_out_1, reward_out_2, reward_weight_1, reward_weight_2
 
     def loss_and_train(self):
         # action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
-        fai_1_target = tf.placeholder(tf.float32, shape=[None, 100])
-        # fai_2_target = tf.placeholder(tf.float32, shape=[None, 100])
+        fai_1_target = tf.placeholder(tf.float32, shape=[None, 64])
+        fai_2_target = tf.placeholder(tf.float32, shape=[None, 64])
         act1_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
-        # act2_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
+        act2_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
+        # for act in range(self.Num_action):
+            # fai_1_prediction = self.fai_1[act]
+            # fai_2_prediction = self.fai_2[act] # tf.reduce_sum(tf.multiply(self.output, action_target), reduction_indices=1)
+            # loss1 = tf.reduce_mean(tf.square(fai_1_prediction - fai_1_target))
+            # loss2 = tf.reduce_mean(tf.square(fai_2_prediction - fai_2_target))
+            # Loss_fai_1.append(loss1)
+            # Loss_fai_2.append(loss2)
+            # train_fai_1.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss1))
+            # train_fai_2.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss2))
         fai_1_reshape = tf.transpose(self.fai_1,[1, 0, 2])
-        act1_target_reshape = tf.reshape(act1_target, [-1, self.Num_action, 1])
-        fai_1_prediction = tf.reduce_sum(tf.multiply(fai_1_reshape, act1_target_reshape), reduction_indices=1)
+        act2_target_reshape = tf.reshape(act1_target, [-1, self.Num_action, 1])
+        fai_1_prediction = tf.reduce_sum(tf.multiply(fai_1_reshape, act2_target_reshape), reduction_indices=1)
         Loss_fai_1 = tf.reduce_mean(tf.square(fai_1_prediction - fai_1_target))
         train_fai_1 = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_fai_1)
 
-        # fai_2_reshape = tf.transpose(self.fai_2, [1, 0, 2])
-        # act2_target_reshape = tf.reshape(act2_target, [-1, self.Num_action, 1])
-        # fai_2_prediction = tf.reduce_sum(tf.multiply(fai_2_reshape, act2_target_reshape))
-        # Loss_fai_2 = tf.reduce_mean(tf.square(fai_2_prediction - fai_2_target))
-        # train_fai_2 = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_fai_2)
+        fai_2_reshape = tf.transpose(self.fai_2, [1, 0, 2])
+        act2_target_reshape = tf.reshape(act2_target, [-1, self.Num_action, 1])
+        fai_2_prediction = tf.reduce_sum(tf.multiply(fai_2_reshape, act2_target_reshape))
+        Loss_fai_2 = tf.reduce_mean(tf.square(fai_2_prediction - fai_2_target))
+        train_fai_2 = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_fai_2)
 
         r_target = tf.placeholder(tf.float32, shape=[None])
-        Loss_r = tf.reduce_mean(tf.square(r_target - self.reward_estimator_1))
+        Loss_r = tf.reduce_mean(tf.square(r_target - (self.reward_estimator_1 + self.reward_estimator_2)))
 
-        # Loss_autoencoder_1 = tf.reduce_mean(tf.square(self.input_1 - self.autoencoder_out_1))
-        # Loss_autoencoder_2 = tf.reduce_mean(tf.square(self.input_2 - self.autoencoder_out_2))
+        Loss_autoencoder_1 = tf.reduce_mean(tf.square(self.input_1 - self.autoencoder_out_1))
+        Loss_autoencoder_2 = tf.reduce_mean(tf.square(self.input_2 - self.autoencoder_out_2))
 
-        # Loss_sum = Loss_autoencoder_1 + Loss_autoencoder_2 + Loss_r
-        train_r = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_r)
+        Loss_sum = Loss_autoencoder_1 + Loss_autoencoder_2 + Loss_r
+        train_r_and_autoencoder = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_sum)
 
-        return fai_1_target, act1_target, train_fai_1, Loss_fai_1, \
-                r_target, Loss_r, train_r
+        return fai_1_target, fai_2_target, act1_target, act2_target, train_fai_1, train_fai_2, Loss_fai_1, Loss_fai_2, \
+                r_target, Loss_r, Loss_autoencoder_1, Loss_autoencoder_2, Loss_sum, train_r_and_autoencoder
 
     def select_action(self, stack_state_1, stack_state_2):
         action_1 = np.zeros([self.Num_action])
         action_1_index = 0
-        # action_2 = np.zeros([self.Num_action])
-        # action_2_index = 0
+        action_2 = np.zeros([self.Num_action])
+        action_2_index = 0
         # choose action
         if self.progress == 'Exploring':
             # choose random action
             action_1_index = random.randint(0, self.Num_action - 1)
-            # action_2_index = random.randint(0, self.Num_action - 1)
+            action_2_index = random.randint(0, self.Num_action - 1)
             action_1[action_1_index] = 1
-            # action_2[action_2_index] = 1
+            action_2[action_2_index] = 1
         elif self.progress == 'Training':
             if random.random() < self.epsilon:
                 # choose random action1
@@ -561,21 +497,21 @@ class VDN_DSR(object):
                     q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1:fai_1[i]}))
                 action_1_index = np.argmax(q_1)
                 action_1[action_1_index] = 1
-            # if random.random() < self.epsilon:
-            #     # choose random action2
-            #     action_2_index = random.randint(0, self.Num_action - 1)
-            #     action_2[action_2_index] = 1
-            # else:
-            #     # choose greedy action2
-            #     st2 = self.state_feature_2.eval(feed_dict={self.input_2: [stack_state_2]})
-            #     fai_2 = []
-            #     for i in range(self.Num_action):
-            #         fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
-            #     q_2 = []
-            #     for i in range(self.Num_action):
-            #         q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
-            #     action_2_index = np.argmax(q_2)
-            #     action_2[action_2_index] = 1
+            if random.random() < self.epsilon:
+                # choose random action2
+                action_2_index = random.randint(0, self.Num_action - 1)
+                action_2[action_2_index] = 1
+            else:
+                # choose greedy action2
+                st2 = self.state_feature_2.eval(feed_dict={self.input_2: [stack_state_2]})
+                fai_2 = []
+                for i in range(self.Num_action):
+                    fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+                q_2 = []
+                for i in range(self.Num_action):
+                    q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+                action_2_index = np.argmax(q_2)
+                action_2[action_2_index] = 1
 
             # Decrease epsilon while training
             if self.epsilon > self.final_epsilon:
@@ -592,7 +528,7 @@ class VDN_DSR(object):
         #
         #     self.epsilon = 0
 
-        return action_1
+        return action_1, action_2
 
     def experience_replay(self, state, action, reward, next_state, terminal):
         # If replay memory is full, delete the oldest experience
@@ -631,100 +567,102 @@ class VDN_DSR(object):
                 self.r_batch_size = 1
 
         next_state_1_batch = [batch[3][0] for batch in minibatch]
-        # next_state_2_batch = [batch[3][1] for batch in minibatch]
+        next_state_2_batch = [batch[3][1] for batch in minibatch]
         reward_batch = [batch[2] for batch in minibatch]
-        _, r_branch_loss = self.sess.run([self.train_r, self.Loss_r], feed_dict={self.input_1:next_state_1_batch,
-                                                                                      self.r_target: reward_batch})
-        self.r_branch_loss += r_branch_loss
+        _, self.r_branch_loss = self.sess.run([self.train_r_and_autoencoder, self.Loss_sum], feed_dict={self.input_1:next_state_1_batch,
+                                                                                                        self.input_2:next_state_2_batch,
+                                                                                                        self.r_target: reward_batch})
+
         # Train fai branch
         minibatch = random.sample(replay_memory, self.Num_batch)
 
         # save the each batch data
         state_1_batch = [batch[0][0] for batch in minibatch]
-        # state_2_batch = [batch[0][1] for batch in minibatch]
+        state_2_batch = [batch[0][1] for batch in minibatch]
         action_1_batch = [batch[1][0] for batch in minibatch]
-        # action_2_batch = [batch[1][1] for batch in minibatch]
+        action_2_batch = [batch[1][1] for batch in minibatch]
         act1_batch = []
-        # act2_batch = []
+        act2_batch = []
         for i in range(len(minibatch)):
             tmp1 = np.zeros([self.Num_action], dtype=np.int8)
-            # tmp2 = np.zeros([self.Num_action], dtype=np.int8)
+            tmp2 = np.zeros([self.Num_action], dtype=np.int8)
             tmp1[action_1_batch[i]] = 1
-            # tmp2[action_2_batch[i]] = 1
+            tmp2[action_2_batch[i]] = 1
             act1_batch.append(tmp1)
-            # act2_batch.append(tmp2)
+            act2_batch.append(tmp2)
         # reward_batch = [batch[2] for batch in minibatch]
         next_state_1_batch = [batch[3][0] for batch in minibatch]
-        # next_state_2_batch = [batch[3][1] for batch in minibatch]
+        next_state_2_batch = [batch[3][1] for batch in minibatch]
         terminal_batch = [batch[4] for batch in minibatch]
+        # action_batch = []
+        # for i in range(len(minibatch)):
+        #     tmp = np.zeros([self.Num_action * self.Num_action])
+        #     index = action_1_batch[i] * self.Num_action + action_2_batch[i]
+        #     tmp[index] = 1
+        #     action_batch.append(tmp)
         # get y_prediction
         y1_batch = []
-        # y2_batch = []
+        y2_batch = []
         fai_1_target_batch = []
-        # fai_2_target_batch = []
+        fai_2_target_batch = []
         next_state_feature_1_batch = self.state_feature_target_1.eval(feed_dict={self.input_target_1:next_state_1_batch})
-        # next_state_feature_2_batch = self.state_feature_target_2.eval(feed_dict={self.input_target_2:next_state_2_batch})
+        next_state_feature_2_batch = self.state_feature_target_2.eval(feed_dict={self.input_target_2:next_state_2_batch})
         for i in range(self.Num_action):
             fai_1_target_batch.append(self.fai_target_1[i].eval(feed_dict={self.fai_input_target_1:next_state_feature_1_batch}))
-            # fai_2_target_batch.append(self.fai_target_2[i].eval(feed_dict={self.fai_input_target_2:next_state_feature_2_batch}))
+            fai_2_target_batch.append(self.fai_target_2[i].eval(feed_dict={self.fai_input_target_2:next_state_feature_2_batch}))
         # Get state feature batches
         state_feature_batch_1 = self.state_feature_1.eval(feed_dict={self.input_1:state_1_batch})
-        # state_feature_batch_2 = self.state_feature_2.eval(feed_dict={self.input_2:state_2_batch})
+        state_feature_batch_2 = self.state_feature_2.eval(feed_dict={self.input_2:state_2_batch})
         # next act batch
         next_act1_batch = []
-        # next_act2_batch = []
+        next_act2_batch = []
         fai_1_batch = []
-        # fai_2_batch = []
+        fai_2_batch = []
         for i in range(self.Num_action):
             fai_1_batch.append(self.fai_1[i].eval(feed_dict={self.fai_input_1:state_feature_batch_1}))
-            # fai_2_batch.append(self.fai_2[i].eval(feed_dict={self.fai_input_2:state_feature_batch_2}))
+            fai_2_batch.append(self.fai_2[i].eval(feed_dict={self.fai_input_2:state_feature_batch_2}))
         q1_batch = []
-        # q2_batch = []
+        q2_batch = []
         for i in range(self.Num_action):
             q1_batch.append(self.q_out_1.eval(feed_dict={self.st_for_q1:fai_1_batch[i]}))
-            # q2_batch.append(self.q_out_2.eval(feed_dict={self.st_for_q2:fai_2_batch[i]}))
+            q2_batch.append(self.q_out_2.eval(feed_dict={self.st_for_q2:fai_2_batch[i]}))
         for i in range(len(minibatch)):
-            tmp1 =[]
-            # tmp2 =[]
+            tmp1 = []
+            tmp2 = []
             for j in range(self.Num_action):
                 tmp1.append(q1_batch[j][i])
-                # tmp2.append(q2_batch[j][i])
+                tmp2.append(q2_batch[j][i])
             next_act1_batch.append(np.argmax(tmp1))
-            # next_act2_batch.append(np.argmax(tmp2))
+            next_act2_batch.append(np.argmax(tmp2))
         # get target fai values
         for i in range(len(minibatch)):
             if terminal_batch[i] == True:
                 y1_batch.append(state_feature_batch_1[i])
-                # y2_batch.append(state_feature_batch_2[i])
+                y2_batch.append(state_feature_batch_2[i])
             else:
                 y1_batch.append(state_feature_batch_1[i] + self.gamma * fai_1_target_batch[next_act1_batch[i]][i])
-                # y2_batch.append(state_feature_batch_2[i] + self.gamma * fai_2_target_batch[next_act2_batch[i]][i])
+                y2_batch.append(state_feature_batch_2[i] + self.gamma * fai_2_target_batch[next_act2_batch[i]][i])
 
-        _= self.sess.run(self.train_fai_1,
-                            feed_dict={self.fai_input_1:state_feature_batch_1,
-                                       self.fai_1_target:y1_batch,
-                                       self.act1_target:act1_batch })
+        _, __ = self.sess.run([self.train_fai_1, self.train_fai_2],
+                                     feed_dict={self.fai_input_1:state_feature_batch_1,
+                                                self.fai_1_target:y1_batch,
+                                                self.act1_target:act1_batch ,
+                                                self.fai_input_2:state_feature_batch_2,
+                                                self.fai_2_target:y2_batch,
+                                                self.act2_target:act2_batch})
 
     def save_model(self):
         # Save the variables to disk.
         if self.step == self.Num_Exploration + self.Num_Training:
-            if WIN:
-                save_path = self.saver.save(self.sess, base_path + self.game_name +
-                                            '//' + self.date_time +  '_' + self.algorithm + "//model.ckpt")
-            else:
-                save_path = self.saver.save(self.sess, base_path + self.game_name +
-                                            '/' + self.date_time + '_' + self.algorithm + "/model.ckpt")
+            save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                        '//' + self.date_time +  '_' + self.algorithm + "//model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def save_model_backup(self):
         # Save the variables to disk.
         if self.step == 101000 or self.step % 100000 == 0:
-            if WIN:
-                save_path = self.saver.save(self.sess, base_path + self.game_name +
-                                            '//' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "//model.ckpt")
-            else:
-                save_path = self.saver.save(self.sess, base_path + self.game_name +
-                                            '/' + self.date_time + '_' + self.algorithm + '_' + str(self.step) + "/model.ckpt")
+            save_path = self.saver.save(self.sess, base_path + self.game_name +
+                                        '//' + self.date_time +  '_' + self.algorithm + '_' + str(self.step) + "//model.ckpt")
             print("Model saved in file: %s" % save_path)
 
     def plotting(self, terminal):
@@ -768,11 +706,6 @@ class VDN_DSR(object):
 
         return stacked_state
 
-    def print_r_loss(self):
-        if self.step % 50000 == 0:
-            print('mean loss of r: %f' % (self.r_branch_loss/50000))
-        self.r_branch_loss = 0
-
     def save_reward(self):
         if WIN:
             dirpath = base_path + self.game_name +'//' + self.date_time + '_' + self.algorithm + '_r'
@@ -785,31 +718,13 @@ class VDN_DSR(object):
         file = pd.DataFrame(columns=name, data=self.reward_database)
         file.to_csv(path)
 
-    def read_reward(self):
-        if WIN:
-            path = base_path + self.game_name +'//' + self.date_time + '_' + self.algorithm + "//rd.csv"
-        else:
-            path = base_path + self.game_name +'/' + self.date_time + '_' + self.algorithm + "/rd.csv"
-        try:
-            file = open(path, 'r', encoding="utf-8")
-            context = file.read()
-            list_result = context.split("\n")
-            length = len(list_result)
-            for i in range(length):
-                list_result[i] = list_result[i].split(",")
-            return list_result
-        except Exception:
-            print('Failed to read rd!')
-        finally:
-            file.close()
-
-
 if __name__ == '__main__':
     agent = VDN_DSR()
     if TEST:
         agent.test()
     else:
         agent.main()
+
 
 
 
