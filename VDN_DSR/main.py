@@ -18,7 +18,7 @@ def to_gray(state):
     return pylab.array(im)
 WIN = False
 TEST = False
-game = 'Fetch_3act_one'
+game = 'Fetch_3act'
 USE_GPU = False
 if WIN:
     base_path = 'F://bs//sf-vdn//VDN_DSR//saved_models//'
@@ -446,8 +446,8 @@ class VDN_DSR(object):
             # train_fai_1.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss1))
             # train_fai_2.append(tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(loss2))
         fai_1_reshape = tf.transpose(self.fai_1,[1, 0, 2])
-        act2_target_reshape = tf.reshape(act1_target, [-1, self.Num_action, 1])
-        fai_1_prediction = tf.reduce_sum(tf.multiply(fai_1_reshape, act2_target_reshape), reduction_indices=1)
+        act1_target_reshape = tf.reshape(act1_target, [-1, self.Num_action, 1])
+        fai_1_prediction = tf.reduce_sum(tf.multiply(fai_1_reshape, act1_target_reshape), reduction_indices=1)
         Loss_fai_1 = tf.reduce_mean(tf.square(fai_1_prediction - fai_1_target))
         train_fai_1 = tf.train.AdamOptimizer(learning_rate=self.learning_rate, epsilon=1e-02).minimize(Loss_fai_1)
 
@@ -565,22 +565,34 @@ class VDN_DSR(object):
                 self.r_batch_size = int(self.r_batch_size * 0.8)
             if self.r_batch_size < 1:
                 self.r_batch_size = 1
-
-        next_state_1_batch = [batch[3][0] for batch in minibatch]
-        next_state_2_batch = [batch[3][1] for batch in minibatch]
-        reward_batch = [batch[2] for batch in minibatch]
+        next_state_1_batch = []
+        next_state_2_batch = []
+        reward_batch = []
+        for batch in minibatch:
+            next_state_1_batch.append(batch[3][0])
+            next_state_2_batch.append(batch[3][1])
+            reward_batch.append(batch[2])
         _, self.r_branch_loss = self.sess.run([self.train_r_and_autoencoder, self.Loss_sum], feed_dict={self.input_1:next_state_1_batch,
                                                                                                         self.input_2:next_state_2_batch,
                                                                                                         self.r_target: reward_batch})
 
         # Train fai branch
         minibatch = random.sample(replay_memory, self.Num_batch)
-
-        # save the each batch data
-        state_1_batch = [batch[0][0] for batch in minibatch]
-        state_2_batch = [batch[0][1] for batch in minibatch]
-        action_1_batch = [batch[1][0] for batch in minibatch]
-        action_2_batch = [batch[1][1] for batch in minibatch]
+        state_1_batch = []
+        state_2_batch = []
+        action_1_batch = []
+        action_2_batch = []
+        next_state_1_batch = []
+        next_state_2_batch = []
+        terminal_batch = []
+        for batch in minibatch:
+            state_1_batch.append(batch[0][0])
+            state_2_batch.append(batch[0][1])
+            action_1_batch.append(batch[1][0])
+            action_2_batch.append(batch[1][1])
+            next_state_1_batch.append(batch[3][0])
+            next_state_2_batch.append(batch[3][1])
+            terminal_batch.append(batch[4])
         act1_batch = []
         act2_batch = []
         for i in range(len(minibatch)):
@@ -591,9 +603,7 @@ class VDN_DSR(object):
             act1_batch.append(tmp1)
             act2_batch.append(tmp2)
         # reward_batch = [batch[2] for batch in minibatch]
-        next_state_1_batch = [batch[3][0] for batch in minibatch]
-        next_state_2_batch = [batch[3][1] for batch in minibatch]
-        terminal_batch = [batch[4] for batch in minibatch]
+
         # action_batch = []
         # for i in range(len(minibatch)):
         #     tmp = np.zeros([self.Num_action * self.Num_action])
@@ -646,7 +656,7 @@ class VDN_DSR(object):
         _, __ = self.sess.run([self.train_fai_1, self.train_fai_2],
                                      feed_dict={self.fai_input_1:state_feature_batch_1,
                                                 self.fai_1_target:y1_batch,
-                                                self.act1_target:act1_batch ,
+                                                self.act1_target:act1_batch,
                                                 self.fai_input_2:state_feature_batch_2,
                                                 self.fai_2_target:y2_batch,
                                                 self.act2_target:act2_batch})

@@ -630,20 +630,34 @@ class VDN_DSR(object):
             if self.r_batch_size < 1:
                 self.r_batch_size = 1
 
-        next_state_1_batch = [batch[3][0] for batch in minibatch]
-        # next_state_2_batch = [batch[3][1] for batch in minibatch]
-        reward_batch = [batch[2] for batch in minibatch]
+        next_state_1_batch = []
+        # next_state_2_batch = []
+        reward_batch = []
+        for batch in minibatch:
+            next_state_1_batch.append(batch[3][0])
+            # next_state_2_batch.append(batch[3][1])
+            reward_batch.append(batch[2])
         _, r_branch_loss = self.sess.run([self.train_r, self.Loss_r], feed_dict={self.input_1:next_state_1_batch,
                                                                                       self.r_target: reward_batch})
         self.r_branch_loss += r_branch_loss
         # Train fai branch
         minibatch = random.sample(replay_memory, self.Num_batch)
+        state_1_batch = []
+        # state_2_batch = []
+        action_1_batch = []
+        # action_2_batch = []
+        next_state_1_batch = []
+        # next_state_2_batch = []
+        terminal_batch = []
+        for batch in minibatch:
+            state_1_batch.append(batch[0][0])
+            # state_2_batch.append(batch[0][1])
+            action_1_batch.append(batch[1][0])
+            # action_2_batch.append(batch[1][1])
+            next_state_1_batch.append(batch[3][0])
+            # next_state_2_batch.append(batch[3][1])
+            terminal_batch.append(batch[4])
 
-        # save the each batch data
-        state_1_batch = [batch[0][0] for batch in minibatch]
-        # state_2_batch = [batch[0][1] for batch in minibatch]
-        action_1_batch = [batch[1][0] for batch in minibatch]
-        # action_2_batch = [batch[1][1] for batch in minibatch]
         act1_batch = []
         # act2_batch = []
         for i in range(len(minibatch)):
@@ -656,7 +670,7 @@ class VDN_DSR(object):
         # reward_batch = [batch[2] for batch in minibatch]
         next_state_1_batch = [batch[3][0] for batch in minibatch]
         # next_state_2_batch = [batch[3][1] for batch in minibatch]
-        terminal_batch = [batch[4] for batch in minibatch]
+        # terminal_batch = [batch[4] for batch in minibatch]
         # get y_prediction
         y1_batch = []
         # y2_batch = []
