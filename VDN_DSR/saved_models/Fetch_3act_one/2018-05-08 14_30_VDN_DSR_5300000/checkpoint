@@ -1,0 +1,6 @@
+model_checkpoint_path: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one//2018-05-08 14_30_VDN_DSR_5300000//model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one//2018-05-08 14_30_VDN_DSR_4900000//model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one//2018-05-08 14_30_VDN_DSR_5000000//model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one//2018-05-08 14_30_VDN_DSR_5100000//model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one//2018-05-08 14_30_VDN_DSR_5200000//model.ckpt"
+all_model_checkpoint_paths: "/home/admin1/zp/VDN_DSR/saved_models/Fetch_3act_one//2018-05-08 14_30_VDN_DSR_5300000//model.ckpt"
