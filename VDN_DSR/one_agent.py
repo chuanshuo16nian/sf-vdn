@@ -8,7 +8,7 @@ import os
 from PIL import Image
 import pylab
 from Parameters1 import Parameters
-from Fetch_3act import GameEnv
+from Fetch_3act_bigr import GameEnv
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
@@ -16,7 +16,7 @@ def to_gray(state):
     im = Image.fromarray(np.uint8(state * 255))
     im = im.convert('L')
     return pylab.array(im)
-WIN = False
+WIN = True
 TEST = False
 game = 'Fetch_3act_one'
 USE_GPU = False
@@ -90,7 +90,9 @@ class VDN_DSR(object):
         # self.Num_colorChannel = Parameters.Num_colorChannel
 
         self.first_dense = Parameters.first_dense
-        self.decoder_dense = Parameters.decoder_dense
+        self.second_dense = Parameters.second_dense
+        self.decoder_first_dense = Parameters.decoder_first_dense
+        self.decoder_second_dense = Parameters.decoder_second_dense
         self.reward_weight = Parameters.reward_weight
         self.fai_first_dense = Parameters.fai_first_dense
         self.fai_second_dense = Parameters.fai_second_dense
@@ -223,7 +225,78 @@ class VDN_DSR(object):
                 stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
                 stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
                 self.episode += 1
-
+    def test_r(self):
+        load_path = input("Please input the model path:")
+        self.saver.restore(self.sess, load_path)
+        print(self.sess.run(self.reward_weight_1))
+        # print(self.sess.run(self.reward_weight_2))
+        states = self.initialization()
+        stacked_states = self.skip_and_stack_frame(states)
+        stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+        stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+        while self.step < self.Num_Testing:
+            # if random.random() < 0.2:
+            #     act1 = random.randint(0, self.Num_action - 1)
+            #     act2 = random.randint(0, self.Num_action - 1)
+            # else:
+            #     # choose greedy action1
+            #     st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
+            #     fai_1 = []
+            #     for i in range(self.Num_action):
+            #         fai_1.append(self.fai_1[i].eval(feed_dict={self.fai_input_1: st1}))
+            #     q_1 = []
+            #     for i in range(self.Num_action):
+            #         q_1.append(self.q_out_1.eval(feed_dict={self.st_for_q1: fai_1[i]}))
+            #     act1 = np.argmax(q_1)
+            #     # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            #     # fai_2 = []
+            #     # for i in range(self.Num_action):
+            #     #     fai_2.append(self.fai_2[i].eval(feed_dict={self.fai_input_2: st2}))
+            #     # q_2 = []
+            #     # for i in range(self.Num_action):
+            #         # q_2.append(self.q_out_2.eval(feed_dict={self.st_for_q2: fai_2[i]}))
+            #     act2 = 2
+            act1 = int(input('act1:'))
+            act2 = 2
+            r1, r2 = self.env.move(act1, act2)
+            self.step += 1
+            agent1_state_pre, agent2_state_pre = self.env.get_states()
+            agent1_state = to_gray(agent1_state_pre)
+            agent2_state = to_gray(agent2_state_pre)
+            agent1_state_reshape = self.reshape_input(agent1_state)
+            agent2_state_reshape = self.reshape_input(agent2_state)
+            states = [agent1_state_reshape, agent2_state_reshape]
+            stacked_states = self.skip_and_stack_frame(states)
+            stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+            stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+            print("act1: %d, act2: %d" % (act1, act2))
+            print("True:r1: %d, r2: %d" % (r1, r2))
+            st1 = self.state_feature_1.eval(feed_dict={self.input_1: stacked_states[0]})
+            # st2 = self.state_feature_2.eval(feed_dict={self.input_2: stacked_states[1]})
+            pr1 = self.q_out_1.eval(feed_dict={self.st_for_q1: st1})
+            # pr2 = self.q_out_2.eval(feed_dict={self.st_for_q2: st2})
+            print(st1)
+            print("Predicted:r1: %f" % pr1)
+            im = self.env.render_env()
+            plt.imshow(im)
+            plt.show(block=False)
+            plt.pause(0.02)
+            plt.clf()
+            terminal = False
+            if r1 == 5 or r2 == 5:
+                terminal = False
+            if terminal:
+                print('Step: ' + str(self.step) + ' / ' +
+                      'Episode: ' + str(self.episode) + ' / ' +
+                      'Progress: ' + self.progress + ' / ' +
+                      'Epsilon: ' + str(self.epsilon) + ' / ' +
+                      'Score: ' + str(self.score))
+                # If game is finished, initialize the state
+                states = self.initialization()
+                stacked_states = self.skip_and_stack_frame(states)
+                stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
+                stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
+                self.episode += 1
     def main(self):
         states = self.initialization()
         stacked_states = self.skip_and_stack_frame(states)
@@ -385,19 +458,29 @@ class VDN_DSR(object):
             w_fc1 = self.weight_variable(network_name + 'w_fc1', self.first_dense)
             b_fc1 = self.bias_variable(network_name + 'b_fc1', self.first_dense[1])
 
-            state_feature = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
+            ah1 = tf.nn.relu(tf.matmul(x_norm, w_fc1) + b_fc1)
 
-            w_decoder = self.weight_variable(network_name + 'w_decoder', self.decoder_dense)
-            b_decoder = self.weight_variable(network_name + 'b_decoder', self.decoder_dense[1])
+            w_fc2 = self.weight_variable(network_name + 'w_fc2', self.second_dense)
+            b_fc2 = self.bias_variable(network_name + 'b_fc2', self.second_dense[1])
 
-            autoencoder_out = tf.matmul(state_feature, w_decoder) + b_decoder
+            state_feature = tf.matmul(ah1, w_fc2) + b_fc2
+
+            w_decoder1 = self.weight_variable(network_name + 'w_decoder1', self.decoder_first_dense)
+            b_decoder1 = self.bias_variable(network_name + 'b_decoder1', self.decoder_first_dense[1])
+
+            autoencoder_h1 = tf.nn.relu(tf.matmul(state_feature, w_decoder1) + b_decoder1)
+
+            w_decoder_out = self.weight_variable(network_name + 'w_decoder_out', self.decoder_second_dense)
+            b_decoder_out = self.bias_variable(network_name + 'b_decoder_out', self.decoder_second_dense[1])
+
+            autoencoder_out = tf.matmul(autoencoder_h1, w_decoder_out) + b_decoder_out
 
             reward_weight = self.weight_variable(network_name + 'reward_weight', self.reward_weight)
-            st = tf.placeholder(tf.float32, shape=[None, 64])
+            st = tf.placeholder(tf.float32, shape=[None, 100])
             reward_estimator = tf.matmul(state_feature, reward_weight)
             reward_out = tf.matmul(st, reward_weight)
 
-            fai_input = tf.placeholder(tf.float32, shape=[None, 64])
+            fai_input = tf.placeholder(tf.float32, shape=[None, 100])
             fai = []
             for i in range(self.Num_action):
                 fai.append(self._fai_net(network_name + str(i), fai_input))
@@ -432,8 +515,8 @@ class VDN_DSR(object):
 
     def loss_and_train(self):
         # action_target = tf.placeholder(tf.float32, shape=[None, self.Num_action * self.Num_action])
-        fai_1_target = tf.placeholder(tf.float32, shape=[None, 64])
-        # fai_2_target = tf.placeholder(tf.float32, shape=[None, 64])
+        fai_1_target = tf.placeholder(tf.float32, shape=[None, 100])
+        # fai_2_target = tf.placeholder(tf.float32, shape=[None, 100])
         act1_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
         # act2_target = tf.placeholder(tf.float32, shape=[None, self.Num_action])
         fai_1_reshape = tf.transpose(self.fai_1,[1, 0, 2])
@@ -719,7 +802,7 @@ class VDN_DSR(object):
 if __name__ == '__main__':
     agent = VDN_DSR()
     if TEST:
-        agent.test()
+        agent.test_r()
     else:
         agent.main()
 

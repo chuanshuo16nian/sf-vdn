@@ -1,0 +1,6 @@
+model_checkpoint_path: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_3act_one_r//2018-05-12 19_3_VDN_DSR_6100000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_3act_one_r//2018-05-12 19_3_VDN_DSR_5700000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_3act_one_r//2018-05-12 19_3_VDN_DSR_5800000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_3act_one_r//2018-05-12 19_3_VDN_DSR_5900000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_3act_one_r//2018-05-12 19_3_VDN_DSR_6000000//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_3act_one_r//2018-05-12 19_3_VDN_DSR_6100000//model.ckpt"

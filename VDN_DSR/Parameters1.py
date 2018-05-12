@@ -7,7 +7,7 @@ class Parameters(object):
     Num_action = 3
     Num_replay_memory = 100000
     Num_start_training = 100000
-    Num_training = 10000000
+    Num_training = 3000000
     Num_update = 10000
     Num_batch = 32
     Num_test = 10000
@@ -26,10 +26,12 @@ class Parameters(object):
     Input_size = 25 * Num_stackFrame
     # img_size = 80
     #
-    first_dense = [Input_size, 64]
-    decoder_dense = [64, Input_size]
-    reward_weight = [64, 1]
+    first_dense = [Input_size, 100]
+    second_dense = [100, 100]
+    decoder_first_dense = [100, 100]
+    decoder_second_dense = [100, Input_size]
+    reward_weight = [100, 1]
 
-    fai_first_dense = [64, 64]
-    fai_second_dense = [64, 64]
-    fai_out_dense = [64,64]
+    fai_first_dense = [100, 100]
+    fai_second_dense = [100, 100]
+    fai_out_dense = [100, 100]
