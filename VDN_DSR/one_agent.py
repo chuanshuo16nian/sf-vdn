@@ -163,7 +163,7 @@ class VDN_DSR(object):
         stacked_states[0] = np.reshape(stacked_states[0], [1, 100])
         stacked_states[1] = np.reshape(stacked_states[1], [1, 100])
         while self.step < self.Num_Testing:
-            if random.random() < 0.2:
+            if random.random() < 0.0:
                 act1 = random.randint(0, self.Num_action - 1)
                 act2 = 2
             else:
@@ -629,7 +629,7 @@ class VDN_DSR(object):
     def train(self, replay_memory):
 
         # Train r branch
-        if random.random() <= 0.8:
+        if random.random() <= 0.9:
             minibatch = random.sample(replay_memory, self.r_batch_size)
         else:
             minibatch = random.sample(self.reward_database, self.r_batch_size)
@@ -802,7 +802,7 @@ class VDN_DSR(object):
 if __name__ == '__main__':
     agent = VDN_DSR()
     if TEST:
-        agent.test_r()
+        agent.test()
     else:
         agent.main()
 

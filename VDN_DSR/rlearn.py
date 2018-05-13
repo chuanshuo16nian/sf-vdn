@@ -17,7 +17,7 @@ def to_gray(state):
     im = im.convert('L')
     return pylab.array(im)
 WIN = True
-TEST = False
+TEST = True
 game = 'Fetch_3act_one_r'
 USE_GPU = False
 if WIN:

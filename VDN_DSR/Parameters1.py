@@ -7,7 +7,7 @@ class Parameters(object):
     Num_action = 3
     Num_replay_memory = 100000
     Num_start_training = 100000
-    Num_training = 3000000
+    Num_training = 10000000
     Num_update = 10000
     Num_batch = 32
     Num_test = 10000
