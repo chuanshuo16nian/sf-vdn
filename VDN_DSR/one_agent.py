@@ -83,7 +83,7 @@ class VDN_DSR(object):
         self.r_batch_size = Parameters.r_batch_size
 
         # parameters for target network
-        self.Num_update_target = Parameters.Num_update
+        self.Num_update_target = Parameters.Num_update################################################################
 
         # parameters for network
         self.input_size = Parameters.Input_size

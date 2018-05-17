@@ -1,0 +1,2 @@
+model_checkpoint_path: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_2act_one//2018-05-18 0_1_VDN_DSR//model.ckpt"
+all_model_checkpoint_paths: "F://bs//sf-vdn//VDN_DSR//saved_models//Fetch_2act_one//2018-05-18 0_1_VDN_DSR//model.ckpt"
